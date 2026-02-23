@@ -1,0 +1,30 @@
+# agents/conversation/routers.py
+
+from .models import ConversationState
+
+CONFIRM_WORDS = {
+    "yes", "correct", "looks good", "proceed",
+    "go ahead", "perfect", "yep", "sure", "confirmed"
+}
+
+def _is_confirmation(state: ConversationState) -> bool:
+    last_user = next(
+        (m.content.lower() for m in reversed(state.messages) if m.role == "user"),
+        "",
+    )
+    return any(word in last_user for word in CONFIRM_WORDS)
+
+
+def route_after_gap_check(state: ConversationState) -> str:
+    if state.mode == "confirm":
+        return "done_node" if _is_confirmation(state) else "confirm_node"
+    if not state.missing:
+        return "confirm_node"
+    if state.mode == "fill_gaps":
+        return "fill_gap_node"
+    return "chat_node"
+
+def route_after_confirm(state: ConversationState) -> str:
+    if _is_confirmation(state):
+        return "done_node"
+    return "chat_node"
