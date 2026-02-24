@@ -64,6 +64,22 @@ def print_assistant(content: str, agent: str):
 def print_user_prompt():
     print(f"{C.GREEN}{C.BOLD}  You ›{C.RESET} ", end="", flush=True)
 
+
+def _fmt_value(value) -> str:
+    if value is None:
+        return "missing"
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True)
+    if isinstance(value, list):
+        if not value:
+            return "missing"
+        return ", ".join(
+            json.dumps(item, sort_keys=True) if isinstance(item, dict) else str(item)
+            for item in value
+        )
+    return str(value)
+
+
 def print_state(state: ConversationState):
     """
     Prints a structured view of the full ConversationState after each turn.
@@ -89,13 +105,12 @@ def print_state(state: ConversationState):
     # Extracted fields
     print(f"  {C.BOLD}Extracted Fields{C.RESET}")
     fields = state.fields.model_dump()
+    missing_slots = set(state.missing)
     for field, value in fields.items():
-        if value is None:
+        if field in missing_slots or value is None or value == []:
             print(f"  {C.DIM}  {field:<12} ✗  missing{C.RESET}")
-        elif isinstance(value, list):
-            print(f"  {C.GREEN}  {field:<12} ✓{C.RESET}  {', '.join(value)}")
         else:
-            print(f"  {C.GREEN}  {field:<12} ✓{C.RESET}  {value}")
+            print(f"  {C.GREEN}  {field:<12} ✓{C.RESET}  {_fmt_value(value)}")
 
     divider("·")
 
@@ -116,12 +131,10 @@ def print_ui_plan(plan: UIPlan):
     """
     header("  ✓ UIPLAN CONFIRMED — READY FOR IR COMPILER", color="\033[42m\033[30m")
     divider()
-    data = plan.model_dump()
+    # Render a clean snapshot: omit unset optional keys instead of printing nulls.
+    data = plan.model_dump(exclude_none=True)
     for field, value in data.items():
-        if isinstance(value, list):
-            print(f"  {C.BOLD}{C.GREEN}{field:<12}{C.RESET}  {', '.join(value)}")
-        else:
-            print(f"  {C.BOLD}{C.GREEN}{field:<12}{C.RESET}  {value}")
+        print(f"  {C.BOLD}{C.GREEN}{field:<12}{C.RESET}  {_fmt_value(value)}")
     divider()
     print(f"\n  {C.DIM}Next step → ir_compiler.compile(ui_plan){C.RESET}\n")
 
@@ -193,13 +206,13 @@ async def run():
 
         # ── Done ──────────────────────────────────────────────────────────────
         if state.mode == "done":
-            ui_plan = UIPlan.from_fields(state.fields)
+            ui_plan = UIPlan.from_spec(state.fields)
             print_ui_plan(ui_plan)
 
             # Optionally write UIPlan to file for inspection
             output_path = "ui_plan.json"
-            with open(output_path, "w") as f: 
-                json.dump(ui_plan.model_dump(), f, indent=2)
+            with open(output_path, "w") as f:
+                json.dump(ui_plan.model_dump(exclude_none=True), f, indent=2)
             print(f"  {C.DIM}UIPlan saved to {output_path}{C.RESET}\n")
             break
 

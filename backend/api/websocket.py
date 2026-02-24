@@ -20,6 +20,16 @@ def _as_state(value: ConversationState | dict) -> ConversationState:
     return ConversationState.model_validate(value)
 
 
+def _is_effectively_empty(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip() == ""
+    if isinstance(value, (list, dict, tuple, set)):
+        return len(value) == 0
+    return False
+
+
 @ws_router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     """
@@ -95,10 +105,11 @@ async def ws_chat(websocket: WebSocket):
                     "agent":      state.active_agent,
                 })
 
-            # ── Send field updates (newly extracted fields) ───────────────────
+            # ── Send field updates (changed extracted fields) ──────────────────
             current_fields = state.fields.model_dump()
             for field, value in current_fields.items():
-                if value is not None and prev_fields.get(field) is None:
+                prev_value = prev_fields.get(field)
+                if value != prev_value and not _is_effectively_empty(value):
                     await _send(websocket, {
                         "type":  "field_update",
                         "field": field,
@@ -123,12 +134,12 @@ async def ws_chat(websocket: WebSocket):
             # ── Done — emit UIPlan and close ──────────────────────────────────
             if state.mode == "done":
                 from backend.agents.conversation.models import UIPlan
-                ui_plan = UIPlan.from_fields(state.fields)
+                ui_plan = UIPlan.from_spec(state.fields)
 
                 await _send(websocket, {
                     "type":       "done",
                     "session_id": session_id,
-                    "ui_plan":    ui_plan.model_dump(),
+                    "ui_plan":    ui_plan.model_dump(exclude_none=True),
                 })
 
                 logger.info(

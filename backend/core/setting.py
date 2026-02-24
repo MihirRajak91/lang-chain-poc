@@ -10,7 +10,7 @@ class AgentSettings(BaseSettings):
     Each agent has its own model, temperature, and max_tokens.
     """
 
-    _env_file = Path(__file__).resolve().parent.parent / ".env"
+    _env_file = Path(__file__).resolve().parents[2] / ".env"
 
     model_config = SettingsConfigDict(
         env_file        = _env_file,

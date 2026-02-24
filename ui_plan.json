@@ -1,0 +1,109 @@
+{
+  "page_goal": "Calculate BMI from stored user records",
+  "layout_zones": [
+    {
+      "zone_id": "zone_table",
+      "component": "DataTable",
+      "anchor": "bottom-right",
+      "size_hint": "full-width",
+      "z_layer": "base",
+      "notes": "medical dashboard"
+    },
+    {
+      "zone_id": "zone_button",
+      "component": "PrimaryButton",
+      "anchor": "center",
+      "size_hint": "auto",
+      "z_layer": "base"
+    },
+    {
+      "zone_id": "zone_modal",
+      "component": "Modal",
+      "anchor": "center",
+      "size_hint": "40%",
+      "z_layer": "overlay"
+    }
+  ],
+  "components": [],
+  "entities": [
+    {
+      "name": "users",
+      "fields": [
+        "id",
+        "name",
+        "height_cm",
+        "weight_kg",
+        "age",
+        "bmi"
+      ],
+      "computed": [
+        "bmi"
+      ],
+      "display_fields": [
+        "name",
+        "age",
+        "bmi"
+      ],
+      "filters": []
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "open_modal",
+      "trigger": "button_click",
+      "target_component_id": "btn_calc",
+      "operation": "open_modal",
+      "payload": {},
+      "validation_rules": [],
+      "requires_confirmation": false
+    },
+    {
+      "action_id": "calculate_bmi",
+      "trigger": "button_click",
+      "target_component_id": "btn_calc",
+      "operation": "calculate_bmi",
+      "payload": {},
+      "validation_rules": [
+        "height_cm_required",
+        "weight_kg_required"
+      ],
+      "requires_confirmation": false
+    }
+  ],
+  "feedback": [
+    {
+      "action_id": "open_modal",
+      "loading_indicator": "spinner",
+      "success_message": "Modal opened",
+      "ui_updates": [
+        "display_result_inline"
+      ]
+    },
+    {
+      "action_id": "calculate_bmi",
+      "loading_indicator": "spinner",
+      "success_message": "BMI calculated",
+      "error_message": "Select user first",
+      "ui_updates": [
+        "display_result_inline",
+        "refresh_table",
+        "close_modal"
+      ]
+    }
+  ],
+  "style": {
+    "tone": "clinical",
+    "theme": "light",
+    "density": "compact",
+    "color_intent": "high-contrast"
+  },
+  "accessibility": {
+    "required_labels": []
+  },
+  "responsive": {
+    "breakpoints": {},
+    "collapse_rules": [],
+    "hidden_on_small": []
+  },
+  "constraints": []
+}
