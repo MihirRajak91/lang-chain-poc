@@ -11,7 +11,9 @@ from .prompts import (
     SUMMARISER_SYSTEM,
     FIELD_QUESTIONS,
 )
-from .validators import evaluate_guideline_critical
+from .routers import is_confirmation_message
+from .validators import evaluate_quality_gate
+from backend.design.recommender import recommend_design_defaults
 
 EXTRACTOR_PARSE_MAX_ATTEMPTS = 2
 EXTRACTOR_RETRY_INSTRUCTION = """
@@ -60,6 +62,10 @@ def extractor_node(state: ConversationState) -> ConversationState:
     logger = get_logger(__name__, agent=agent.name)
     state.active_agent = agent.name
 
+    if _should_skip_extractor(state):
+        logger.info("Skipping extraction for confirmation-only turn in confirm mode")
+        return state
+
     logger.info("Extracting fields from conversation")
 
     recent_messages = _get_recent_messages(state, n_user_turns=2)
@@ -76,6 +82,20 @@ def extractor_node(state: ConversationState) -> ConversationState:
         logger.debug("No new slots updated this turn")
 
     return state
+
+
+def _latest_user_text(state: ConversationState) -> str:
+    return next(
+        (m.content for m in reversed(state.messages) if m.role == "user"),
+        "",
+    )
+
+
+def _should_skip_extractor(state: ConversationState) -> bool:
+    if state.mode != "confirm":
+        return False
+    last_user = _latest_user_text(state)
+    return is_confirmation_message(last_user, strict=True)
 
 
 def _strip_fences(raw: str) -> str:
@@ -213,6 +233,45 @@ def _merge_into_spec(
             logger.warning("Failed to merge style: %s", exc)
             spec.update_slot_status("style", "uncertain", 0.0)
 
+    # ── product_context ──────────────────────────────────────────────────────
+    product_context = extracted.get("product_context")
+    if product_context and isinstance(product_context, dict):
+        try:
+            changed = spec.merge_product_context(product_context)
+            if changed:
+                spec.update_slot_status("product_context", "complete")
+                updated.append("product_context")
+                logger.debug("  product_context → %s", product_context)
+        except Exception as exc:
+            logger.warning("Failed to merge product_context: %s", exc)
+            spec.update_slot_status("product_context", "uncertain", 0.0)
+
+    # ── design_intent ────────────────────────────────────────────────────────
+    design_intent = extracted.get("design_intent")
+    if design_intent and isinstance(design_intent, dict):
+        try:
+            changed = spec.merge_design_intent(design_intent)
+            if changed:
+                spec.update_slot_status("design_intent", "complete")
+                updated.append("design_intent")
+                logger.debug("  design_intent → %s", design_intent)
+        except Exception as exc:
+            logger.warning("Failed to merge design_intent: %s", exc)
+            spec.update_slot_status("design_intent", "uncertain", 0.0)
+
+    # ── design_system ────────────────────────────────────────────────────────
+    design_system = extracted.get("design_system")
+    if design_system and isinstance(design_system, dict):
+        try:
+            changed = spec.merge_design_system(design_system)
+            if changed:
+                spec.update_slot_status("design_system", "complete")
+                updated.append("design_system")
+                logger.debug("  design_system → %s", design_system)
+        except Exception as exc:
+            logger.warning("Failed to merge design_system: %s", exc)
+            spec.update_slot_status("design_system", "uncertain", 0.0)
+
     # ── accessibility ────────────────────────────────────────────────────────
     accessibility = extracted.get("accessibility")
     if accessibility and isinstance(accessibility, dict):
@@ -295,8 +354,19 @@ def gap_check_node(state: ConversationState) -> ConversationState:
 
     prev_mode = state.mode
 
-    guideline_issues = evaluate_guideline_critical(state.fields)
-    state.guideline_violations = [issue.message for issue in guideline_issues]
+    if settings.design_intel_enabled:
+        snapshot = recommend_design_defaults(state.fields)
+        state.recommendation_snapshot = snapshot.model_dump(exclude_none=True)
+        logger.debug(
+            "Design recommendation snapshot refreshed: engine=%s",
+            snapshot.engine,
+        )
+    else:
+        state.recommendation_snapshot = {}
+
+    gate_mode = getattr(settings, "quality_gate_mode", "hybrid")
+    gate = evaluate_quality_gate(state.fields, gate_mode=gate_mode)
+    state.guideline_violations = [issue.message for issue in gate.blocking_findings]
 
     if state.missing:
         if (
@@ -305,18 +375,21 @@ def gap_check_node(state: ConversationState) -> ConversationState:
         ):
             state.mode = "fill_gaps"
         state.current_gap = state.missing[0]
-    elif guideline_issues:
+    elif gate.blocking_findings:
         state.mode = "fill_gaps"
-        state.current_gap = guideline_issues[0].slot
+        state.current_gap = gate.blocking_findings[0].slot
     else:
         if state.mode == "fill_gaps":
             state.mode = "free_chat"
         state.current_gap = None
 
     logger.info(
-        "Missing: [%s] | Compliance issues: %d | Mode: %s%s",
+        "Missing: [%s] | Critical: %d | Warnings: %d | Blocking: %d | Gate: %s | Mode: %s%s",
         ", ".join(state.missing) if state.missing else "none",
-        len(guideline_issues),
+        len(gate.critical_violations),
+        len(gate.warning_findings),
+        len(gate.blocking_findings),
+        gate.gate_mode,
         state.mode,
         f" (switched from {prev_mode})" if state.mode != prev_mode else "",
     )

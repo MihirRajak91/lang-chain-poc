@@ -1,0 +1,80 @@
+[
+  {
+    "id": "pattern_dashboard_master_detail",
+    "title": "Dashboard Master-Detail",
+    "description": "List/table overview paired with a detail panel to reduce context switching in data workflows.",
+    "tags": ["dashboard", "master_detail", "data_ui", "productivity"],
+    "references": [
+      "https://www.nngroup.com/articles/master-detail/"
+    ],
+    "metadata": {
+      "recommended_components": ["DataTable", "DetailCard", "FilterToolbar"],
+      "best_for": ["operations", "analytics", "admin"]
+    }
+  },
+  {
+    "id": "pattern_split_list_detail",
+    "title": "Split List-Detail",
+    "description": "Two-pane layout where selection in the list updates adjacent details in real time.",
+    "tags": ["split_view", "list_detail", "desktop_first"],
+    "references": [
+      "https://developer.apple.com/design/human-interface-guidelines/split-views"
+    ],
+    "metadata": {
+      "recommended_components": ["List", "Panel", "Tabs"],
+      "breakpoint_behavior": "stack_on_small"
+    }
+  },
+  {
+    "id": "pattern_modal_confirmation",
+    "title": "Modal Confirmation",
+    "description": "Use confirmation modal or undo for destructive actions to prevent accidental loss.",
+    "tags": ["modal", "safety", "confirmation", "destructive_actions"],
+    "references": [
+      "https://www.nngroup.com/articles/confirmation-dialog/"
+    ],
+    "metadata": {
+      "recommended_components": ["Modal", "PrimaryButton", "SecondaryButton"],
+      "requires": ["destructive_action_confirmation"]
+    }
+  },
+  {
+    "id": "pattern_progressive_disclosure_form",
+    "title": "Progressive Disclosure Form",
+    "description": "Reveal advanced controls only when needed to reduce cognitive load and form abandonment.",
+    "tags": ["forms", "progressive_disclosure", "usability"],
+    "references": [
+      "https://www.nngroup.com/articles/progressive-disclosure/"
+    ],
+    "metadata": {
+      "recommended_components": ["Form", "Accordion", "HelperText"],
+      "best_for": ["complex_workflows", "settings"]
+    }
+  },
+  {
+    "id": "pattern_filterable_table_toolbar",
+    "title": "Filterable Table + Toolbar",
+    "description": "Toolbar with search/filter/sort controls mapped to table state and URL query params.",
+    "tags": ["table", "filters", "url_state", "search"],
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams"
+    ],
+    "metadata": {
+      "recommended_components": ["DataTable", "FilterToolbar", "Pagination"],
+      "requires": ["url_state_sync"]
+    }
+  },
+  {
+    "id": "pattern_toast_inline_feedback",
+    "title": "Toast + Inline Feedback",
+    "description": "Combine transient toast messaging with persistent inline result/error states for reliability.",
+    "tags": ["feedback", "toast", "inline_status", "error_handling"],
+    "references": [
+      "https://www.nngroup.com/articles/error-message-guidelines/"
+    ],
+    "metadata": {
+      "recommended_components": ["Toast", "InlineAlert", "StatusBadge"],
+      "best_for": ["async_actions", "form_submits", "table_actions"]
+    }
+  }
+]

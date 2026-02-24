@@ -1,0 +1,103 @@
+[
+  {
+    "id": "product_internal_ops_dashboard",
+    "title": "Internal Ops Dashboard",
+    "description": "Tooling for operations teams with high-frequency actions, dense tables, and workflow speed priorities.",
+    "tags": ["internal", "ops", "dashboard", "b2b"],
+    "references": [
+      "https://www.nngroup.com/articles/dashboard-design/"
+    ],
+    "metadata": {
+      "is_default_profile": true,
+      "recommended_style": "style_ops_compact",
+      "recommended_patterns": [
+        "pattern_dashboard_master_detail",
+        "pattern_filterable_table_toolbar"
+      ],
+      "default_constraints": ["url_state_sync", "prefers_reduced_motion", "intl_formatting"],
+      "default_component_library": "shadcn/ui",
+      "default_icon_set": "lucide",
+      "default_token_source": "tailwind_tokens"
+    }
+  },
+  {
+    "id": "product_healthcare_clinical_review",
+    "title": "Healthcare Clinical Review",
+    "description": "Clinical review surfaces requiring trust, accessibility, and clear status communication.",
+    "tags": ["healthcare", "clinical", "compliance", "trust"],
+    "references": [
+      "https://www.hhs.gov/hipaa/index.html"
+    ],
+    "metadata": {
+      "recommended_style": "style_clinical_minimal",
+      "recommended_patterns": [
+        "pattern_dashboard_master_detail",
+        "pattern_toast_inline_feedback"
+      ],
+      "default_constraints": ["forms_labeled", "prefers_reduced_motion", "intl_formatting"],
+      "default_component_library": "shadcn/ui",
+      "default_icon_set": "lucide",
+      "default_token_source": "tailwind_tokens"
+    }
+  },
+  {
+    "id": "product_b2b_admin_console",
+    "title": "B2B Admin Console",
+    "description": "Administration interface for enterprise customers with role-based controls and audit surfaces.",
+    "tags": ["admin", "b2b", "enterprise", "rbac"],
+    "references": [
+      "https://owasp.org/www-project-top-ten/"
+    ],
+    "metadata": {
+      "recommended_style": "style_finance_professional",
+      "recommended_patterns": [
+        "pattern_filterable_table_toolbar",
+        "pattern_modal_confirmation"
+      ],
+      "default_constraints": ["url_state_sync", "forms_labeled", "prefers_reduced_motion"],
+      "default_component_library": "mantine",
+      "default_icon_set": "tabler-icons",
+      "default_token_source": "css_variables"
+    }
+  },
+  {
+    "id": "product_consumer_onboarding",
+    "title": "Consumer Onboarding",
+    "description": "Step-based onboarding flow focused on trust, clarity, and completion rate.",
+    "tags": ["consumer", "onboarding", "conversion", "forms"],
+    "references": [
+      "https://www.nngroup.com/articles/first-time-user-onboarding/"
+    ],
+    "metadata": {
+      "recommended_style": "style_marketing_expressive",
+      "recommended_patterns": [
+        "pattern_progressive_disclosure_form",
+        "pattern_toast_inline_feedback"
+      ],
+      "default_constraints": ["forms_labeled", "prefers_reduced_motion"],
+      "default_component_library": "shadcn/ui",
+      "default_icon_set": "lucide",
+      "default_token_source": "tailwind_tokens"
+    }
+  },
+  {
+    "id": "product_marketplace_console",
+    "title": "Marketplace Console",
+    "description": "Catalog and order management console mixing analytics views, tables, and operational actions.",
+    "tags": ["marketplace", "commerce", "console", "operations"],
+    "references": [
+      "https://www.nngroup.com/articles/ecommerce-product-page-ux/"
+    ],
+    "metadata": {
+      "recommended_style": "style_ops_compact",
+      "recommended_patterns": [
+        "pattern_filterable_table_toolbar",
+        "pattern_split_list_detail"
+      ],
+      "default_constraints": ["url_state_sync", "intl_formatting", "prefers_reduced_motion"],
+      "default_component_library": "shadcn/ui",
+      "default_icon_set": "lucide",
+      "default_token_source": "tailwind_tokens"
+    }
+  }
+]

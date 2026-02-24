@@ -1,0 +1,84 @@
+[
+  {
+    "id": "type_humanist_ui",
+    "title": "Humanist UI Sans",
+    "description": "Readable sans-serif pairing for dense interfaces and long-form scanning.",
+    "tags": ["ui", "sans", "readability", "dashboard"],
+    "references": [
+      "https://fonts.google.com/specimen/Source+Sans+3"
+    ],
+    "metadata": {
+      "heading_family": "Manrope",
+      "body_family": "Source Sans 3",
+      "mono_family": "IBM Plex Mono",
+      "base_size_px": 16,
+      "line_height": 1.5
+    }
+  },
+  {
+    "id": "type_editorial_contrast",
+    "title": "Editorial Contrast",
+    "description": "Expressive heading/body contrast for storytelling and marketing pages.",
+    "tags": ["marketing", "editorial", "contrast", "landing"],
+    "references": [
+      "https://fonts.google.com/specimen/Fraunces"
+    ],
+    "metadata": {
+      "heading_family": "Fraunces",
+      "body_family": "DM Sans",
+      "mono_family": "JetBrains Mono",
+      "base_size_px": 18,
+      "line_height": 1.6
+    }
+  },
+  {
+    "id": "type_data_mono_support",
+    "title": "Data + Mono Support",
+    "description": "Typography setup optimized for metrics, tabular numbers, and code-like identifiers.",
+    "tags": ["data", "tables", "monospace", "analytics"],
+    "references": [
+      "https://fonts.google.com/specimen/IBM+Plex+Mono"
+    ],
+    "metadata": {
+      "heading_family": "IBM Plex Sans",
+      "body_family": "IBM Plex Sans",
+      "mono_family": "IBM Plex Mono",
+      "base_size_px": 15,
+      "line_height": 1.45,
+      "tabular_numbers": true
+    }
+  },
+  {
+    "id": "type_mobile_legible",
+    "title": "Mobile Legible",
+    "description": "Small-screen-first typography balancing character width and scannability.",
+    "tags": ["mobile", "legibility", "responsive"],
+    "references": [
+      "https://material.io/design/typography/the-type-system.html"
+    ],
+    "metadata": {
+      "heading_family": "Plus Jakarta Sans",
+      "body_family": "Atkinson Hyperlegible",
+      "mono_family": "Fira Mono",
+      "base_size_px": 16,
+      "line_height": 1.55
+    }
+  },
+  {
+    "id": "type_accessibility_large",
+    "title": "Accessibility Large Text",
+    "description": "Typography baseline tuned for high readability and low cognitive load.",
+    "tags": ["a11y", "large_text", "inclusive", "wcag"],
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html"
+    ],
+    "metadata": {
+      "heading_family": "Atkinson Hyperlegible",
+      "body_family": "Atkinson Hyperlegible",
+      "mono_family": "Cascadia Mono",
+      "base_size_px": 18,
+      "line_height": 1.6,
+      "min_body_px": 16
+    }
+  }
+]

@@ -116,6 +116,43 @@ class ResponsiveSpec(BaseModel):
     hidden_on_small: list[str]      = Field(default_factory=list)
 
 
+class ProductContextSpec(BaseModel):
+    """
+    Product/business context captured from conversation.
+    Maps to planner defaults before IR compilation.
+    """
+    product_type:      Optional[str] = None
+    domain:            Optional[str] = None
+    audience:          Optional[str] = None
+    primary_platform:  Optional[Literal["web", "mobile_web", "desktop_web"]] = None
+    notes:             Optional[str] = None
+
+
+class DesignIntentSpec(BaseModel):
+    """
+    UX intent and priorities.
+    Maps to hierarchy, interaction density, and flow strategy in IR.
+    """
+    core_tasks:            list[str] = Field(default_factory=list)
+    visual_tone:           Optional[str] = None
+    usability_priorities:  list[str] = Field(default_factory=list)
+    trust_signals:         list[str] = Field(default_factory=list)
+    notes:                 Optional[str] = None
+
+
+class DesignSystemSpec(BaseModel):
+    """
+    Design-system level constraints/preferences.
+    Maps to component/token binding decisions in generated React output.
+    """
+    system_name:        Optional[str] = None
+    component_library:  Optional[str] = None
+    icon_set:           Optional[str] = None
+    token_source:       Optional[str] = None
+    tailwind_preset:    Optional[str] = None
+    notes:              Optional[str] = None
+
+
 # ── RequirementSpec ───────────────────────────────────────────────────────────
 
 class RequirementSpec(BaseModel):
@@ -143,6 +180,9 @@ class RequirementSpec(BaseModel):
     style:         StyleSpec            = Field(default_factory=StyleSpec)
     accessibility: A11ySpec            = Field(default_factory=A11ySpec)
     responsive:    ResponsiveSpec       = Field(default_factory=ResponsiveSpec)
+    product_context: ProductContextSpec = Field(default_factory=ProductContextSpec)
+    design_intent:   DesignIntentSpec   = Field(default_factory=DesignIntentSpec)
+    design_system:   DesignSystemSpec   = Field(default_factory=DesignSystemSpec)
     constraints:   list[str]            = Field(default_factory=list)
 
     # Per-slot extraction quality — drives gap router
@@ -508,6 +548,79 @@ class RequirementSpec(BaseModel):
                 changed = True
         return changed
 
+    def merge_product_context(self, incoming: dict) -> bool:
+        """Merge product context metadata into self.product_context."""
+        if not isinstance(incoming, dict):
+            return False
+
+        changed = False
+        for attr in ["product_type", "domain", "audience", "notes"]:
+            val = self._clean_str(incoming.get(attr))
+            if val and getattr(self.product_context, attr) != val:
+                setattr(self.product_context, attr, val)
+                changed = True
+
+        platform = self._clean_str(incoming.get("primary_platform"))
+        if platform:
+            normalized = platform.lower().replace("-", "_").replace(" ", "_")
+            if normalized == "web" and self.product_context.primary_platform != "web":
+                self.product_context.primary_platform = "web"
+                changed = True
+            elif normalized == "mobile_web" and self.product_context.primary_platform != "mobile_web":
+                self.product_context.primary_platform = "mobile_web"
+                changed = True
+            elif normalized == "desktop_web" and self.product_context.primary_platform != "desktop_web":
+                self.product_context.primary_platform = "desktop_web"
+                changed = True
+
+        return changed
+
+    def merge_design_intent(self, incoming: dict) -> bool:
+        """Merge design intent metadata into self.design_intent."""
+        if not isinstance(incoming, dict):
+            return False
+
+        changed = False
+        for attr in ["visual_tone", "notes"]:
+            val = self._clean_str(incoming.get(attr))
+            if val and getattr(self.design_intent, attr) != val:
+                setattr(self.design_intent, attr, val)
+                changed = True
+
+        for attr in ["core_tasks", "usability_priorities", "trust_signals"]:
+            existing = getattr(self.design_intent, attr)
+            new_values = [
+                item
+                for item in self._clean_str_list(incoming.get(attr))
+                if item not in existing
+            ]
+            if new_values:
+                existing.extend(new_values)
+                changed = True
+
+        return changed
+
+    def merge_design_system(self, incoming: dict) -> bool:
+        """Merge design system/tooling metadata into self.design_system."""
+        if not isinstance(incoming, dict):
+            return False
+
+        changed = False
+        for attr in [
+            "system_name",
+            "component_library",
+            "icon_set",
+            "token_source",
+            "tailwind_preset",
+            "notes",
+        ]:
+            val = self._clean_str(incoming.get(attr))
+            if val and getattr(self.design_system, attr) != val:
+                setattr(self.design_system, attr, val)
+                changed = True
+
+        return changed
+
     def merge_accessibility(self, incoming: dict) -> bool:
         """Merge accessibility dict into self.accessibility."""
         if not isinstance(incoming, dict):
@@ -646,6 +759,7 @@ class ConversationState(BaseModel):
     confirmed:    bool            = False
     active_agent: Optional[str]   = None
     guideline_violations: list[str] = Field(default_factory=list)
+    recommendation_snapshot: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def missing(self) -> list[str]:

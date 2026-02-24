@@ -1,10 +1,10 @@
 {
-  "page_goal": "Calculate BMI from stored user records.",
+  "page_goal": "Review patient rows and calculate BMI quickly.",
   "layout_zones": [
     {
       "zone_id": "zone_table",
       "component": "DataTable",
-      "anchor": "bottom-right"
+      "anchor": "full-width"
     },
     {
       "zone_id": "zone_button",
@@ -21,13 +21,13 @@
   "components": [],
   "entities": [
     {
-      "name": "users",
+      "name": "patients",
       "fields": [
         "id",
-        "name",
+        "full_name",
+        "age",
         "height_cm",
         "weight_kg",
-        "age",
         "bmi"
       ],
       "computed": [],
@@ -37,9 +37,9 @@
   ],
   "actions": [
     {
-      "action_id": "open_modal",
-      "trigger": "button_click",
-      "operation": "open_modal",
+      "action_id": "load_patient_detail",
+      "trigger": "row_select",
+      "operation": "load_patient_detail",
       "payload": {},
       "validation_rules": [],
       "requires_confirmation": false
@@ -51,19 +51,23 @@
       "payload": {},
       "validation_rules": [],
       "requires_confirmation": false
+    },
+    {
+      "action_id": "save_note",
+      "trigger": "form_submit",
+      "operation": "save_note",
+      "payload": {},
+      "validation_rules": [],
+      "requires_confirmation": false
     }
   ],
   "feedback": [
     {
-      "action_id": "open_modal",
-      "ui_updates": [
-        "show modal"
-      ]
-    },
-    {
       "action_id": "calculate_bmi",
+      "loading_indicator": "spinner",
+      "success_message": "BMI calculated",
       "ui_updates": [
-        "show result",
+        "display_result_inline",
         "refresh_table"
       ]
     }
@@ -71,14 +75,16 @@
   "style": {
     "tone": "clinical",
     "theme": "light",
-    "density": "compact",
+    "density": "comfortable",
     "color_intent": "high-contrast"
   },
   "accessibility": {
     "keyboard_navigation": true,
+    "semantic_landmarks": true,
     "required_labels": [
-      "close dialog",
-      "open menu"
+      "Close dialog",
+      "Open filters",
+      "Main menu"
     ]
   },
   "responsive": {

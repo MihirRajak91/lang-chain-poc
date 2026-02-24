@@ -1,0 +1,93 @@
+[
+  {
+    "id": "warning_semantic_landmarks",
+    "title": "Semantic Landmarks Recommended",
+    "description": "Define primary regions (header, nav, main, footer) to improve navigation and assistive tech clarity.",
+    "severity": "warning",
+    "references": [
+      "https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/"
+    ],
+    "checks": [
+      "a11y.semantic_landmarks == true"
+    ],
+    "metadata": {
+      "slot": "accessibility"
+    }
+  },
+  {
+    "id": "warning_define_responsive_strategy",
+    "title": "Responsive Strategy Should Be Explicit",
+    "description": "Specify desktop-first, mobile-first, or adaptive behavior before code generation.",
+    "severity": "warning",
+    "references": [
+      "https://web.dev/responsive-web-design-basics/"
+    ],
+    "checks": [
+      "responsive.strategy is set"
+    ],
+    "metadata": {
+      "slot": "responsive"
+    }
+  },
+  {
+    "id": "warning_define_core_tasks",
+    "title": "Core Tasks Should Be Captured",
+    "description": "List top user tasks to optimize hierarchy and default focus of generated UI.",
+    "severity": "warning",
+    "references": [
+      "https://www.nngroup.com/articles/task-analysis/"
+    ],
+    "checks": [
+      "design_intent.core_tasks.length > 0"
+    ],
+    "metadata": {
+      "slot": "design_intent"
+    }
+  },
+  {
+    "id": "warning_define_component_library",
+    "title": "Component Library Preference",
+    "description": "Specify target component library to reduce ambiguity and improve consistency.",
+    "severity": "warning",
+    "references": [
+      "https://ui.shadcn.com/",
+      "https://mui.com/"
+    ],
+    "checks": [
+      "design_system.component_library is set"
+    ],
+    "metadata": {
+      "slot": "design_system"
+    }
+  },
+  {
+    "id": "warning_loading_feedback_consistency",
+    "title": "Loading Feedback Consistency",
+    "description": "All async actions should provide predictable loading feedback (spinner/skeleton/progress).",
+    "severity": "warning",
+    "references": [
+      "https://www.nngroup.com/articles/response-times-3-important-limits/"
+    ],
+    "checks": [
+      "feedback entries define loading behavior for async actions"
+    ],
+    "metadata": {
+      "slot": "feedback"
+    }
+  },
+  {
+    "id": "warning_error_feedback_clarity",
+    "title": "Error Feedback Clarity",
+    "description": "Error states should include actionable text with recovery next-step guidance.",
+    "severity": "warning",
+    "references": [
+      "https://www.nngroup.com/articles/error-message-guidelines/"
+    ],
+    "checks": [
+      "feedback error messages are actionable"
+    ],
+    "metadata": {
+      "slot": "feedback"
+    }
+  }
+]

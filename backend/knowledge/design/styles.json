@@ -1,0 +1,77 @@
+[
+  {
+    "id": "style_clinical_minimal",
+    "title": "Clinical Minimal",
+    "description": "Calm, low-noise visual language for healthcare and regulated workflows where readability and trust matter most.",
+    "tags": ["healthcare", "minimal", "trust", "data_ui"],
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/quickref/"
+    ],
+    "metadata": {
+      "tone": "clinical",
+      "theme": "light",
+      "density": "comfortable",
+      "color_intent": "neutral"
+    }
+  },
+  {
+    "id": "style_ops_compact",
+    "title": "Ops Compact",
+    "description": "High information density style for internal operations tools with heavy tables and frequent scanning.",
+    "tags": ["internal_tools", "compact", "dashboard", "tables"],
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles"
+    ],
+    "metadata": {
+      "tone": "functional",
+      "theme": "light",
+      "density": "compact",
+      "color_intent": "neutral"
+    }
+  },
+  {
+    "id": "style_finance_professional",
+    "title": "Finance Professional",
+    "description": "Conservative UI style with structured hierarchy, clear status semantics, and restrained color usage.",
+    "tags": ["finance", "professional", "status", "clarity"],
+    "references": [
+      "https://www.nngroup.com/articles/visual-hierarchy-ux-definitions/"
+    ],
+    "metadata": {
+      "tone": "professional",
+      "theme": "light",
+      "density": "comfortable",
+      "color_intent": "brand"
+    }
+  },
+  {
+    "id": "style_marketing_expressive",
+    "title": "Marketing Expressive",
+    "description": "Visually rich style for conversion-focused pages with strong hierarchy and intentional emphasis.",
+    "tags": ["marketing", "expressive", "landing_page", "conversion"],
+    "references": [
+      "https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/"
+    ],
+    "metadata": {
+      "tone": "expressive",
+      "theme": "light",
+      "density": "spacious",
+      "color_intent": "brand"
+    }
+  },
+  {
+    "id": "style_accessible_high_contrast",
+    "title": "Accessible High Contrast",
+    "description": "Accessibility-first style with strong contrast, clear focus states, and reduced decorative noise.",
+    "tags": ["a11y", "high_contrast", "wcag", "inclusive"],
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+    ],
+    "metadata": {
+      "tone": "accessible",
+      "theme": "light",
+      "density": "comfortable",
+      "color_intent": "high_contrast"
+    }
+  }
+]

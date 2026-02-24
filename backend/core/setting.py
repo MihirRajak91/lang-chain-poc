@@ -3,6 +3,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 class AgentSettings(BaseSettings):
     """
@@ -44,6 +45,12 @@ class AgentSettings(BaseSettings):
 
     # ── App behaviour ──────────────────────────────────────────────────────────
     free_chat_turn_threshold:      int   = 6
+
+    # ── Feature flags (Step 1: config-only, no behavior wiring yet) ─────────
+    design_intel_enabled:          bool = True
+    react_quality_audit_enabled:   bool = True
+    quality_gate_mode:             Literal["hybrid", "hard", "advisory"] = "hybrid"
+    knowledge_pack_version:        str = "v1-curated"
 
     # ── Logging ────────────────────────────────────────────────────────────────
     log_level: str = "INFO"   # DEBUG | INFO | WARNING | ERROR

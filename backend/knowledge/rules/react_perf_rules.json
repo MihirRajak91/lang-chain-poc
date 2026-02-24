@@ -1,0 +1,93 @@
+[
+  {
+    "id": "react_perf_virtualize_large_lists",
+    "title": "Virtualize Large Lists",
+    "description": "Use windowing/virtualization for long tables and lists to keep render cost bounded.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/learn/rendering-lists",
+      "https://tanstack.com/virtual"
+    ],
+    "checks": [
+      "large_collections_use_virtualization"
+    ],
+    "metadata": {
+      "category": "rendering"
+    }
+  },
+  {
+    "id": "react_perf_split_heavy_routes",
+    "title": "Code-split Heavy Routes",
+    "description": "Lazy-load route-level bundles and heavy dialogs/charts to improve initial load time.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/reference/react/lazy"
+    ],
+    "checks": [
+      "route_or_feature_level_code_splitting_present"
+    ],
+    "metadata": {
+      "category": "bundling"
+    }
+  },
+  {
+    "id": "react_perf_stable_callbacks",
+    "title": "Stable Callback References",
+    "description": "Avoid unnecessary child rerenders by keeping frequently passed callback identities stable.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/reference/react/useCallback"
+    ],
+    "checks": [
+      "hot_path_callbacks_are_stable"
+    ],
+    "metadata": {
+      "category": "rerender_control"
+    }
+  },
+  {
+    "id": "react_perf_memoize_expensive_compute",
+    "title": "Memoize Expensive Computation",
+    "description": "Memoize derived datasets and costly transforms used in render.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/reference/react/useMemo"
+    ],
+    "checks": [
+      "expensive_derivations_are_memoized"
+    ],
+    "metadata": {
+      "category": "computation"
+    }
+  },
+  {
+    "id": "react_perf_avoid_overshared_context",
+    "title": "Avoid Overshared Context State",
+    "description": "Keep context values narrow and split providers to prevent broad rerender cascades.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/reference/react/createContext"
+    ],
+    "checks": [
+      "context_domains_are_split"
+    ],
+    "metadata": {
+      "category": "state_management"
+    }
+  },
+  {
+    "id": "react_perf_async_boundaries",
+    "title": "Use Async Boundaries",
+    "description": "Introduce loading/error boundaries around async regions to avoid blocking whole-page rendering.",
+    "severity": "warning",
+    "references": [
+      "https://react.dev/reference/react/Suspense"
+    ],
+    "checks": [
+      "async_regions_have_loading_error_boundaries"
+    ],
+    "metadata": {
+      "category": "async"
+    }
+  }
+]

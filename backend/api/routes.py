@@ -2,13 +2,17 @@
 
 from fastapi             import APIRouter, HTTPException
 from pydantic            import BaseModel
+from typing              import Literal
 from backend.core.logger import get_logger
+from backend.core.setting import get_settings
 from backend.core.session import (
     get_session,
     save_session,
     clear_session,
     session_exists,
 )
+from backend.agents.conversation.validators import evaluate_quality_gate
+from backend.emitter.audit import EmitAuditReport, build_emit_audit_report
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -41,6 +45,7 @@ class EmitRequest(BaseModel):
 class EmitResponse(BaseModel):
     session_id: str
     files:      dict[str, str]   # filename → file content
+    audit_report: EmitAuditReport
 
 class PatchRequest(BaseModel):
     session_id: str
@@ -55,10 +60,21 @@ class PatchResponse(BaseModel):
     message:    str
 
 class SessionStatusResponse(BaseModel):
+    class QualitySummary(BaseModel):
+        gate_mode: Literal["hybrid", "hard", "advisory"]
+        is_blocked: bool
+        critical_count: int
+        warning_count: int
+        blocking_count: int
+        critical_violations: list[str]
+        warning_findings: list[str]
+        blocking_findings: list[str]
+
     session_id:   str
     mode:         str
     missing:      list[str]
     guideline_violations: list[str]
+    quality:      QualitySummary
     confirmed:    bool
     active_agent: str | None
     turns:        int
@@ -176,6 +192,9 @@ async def emit_code(req: EmitRequest):
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
+        state = get_session(req.session_id)
+        settings = get_settings()
+
         # TODO Sprint 3: wire emitter agent
         # from agents.emitter import EmitterAgent
         # files = await EmitterAgent().emit(sub_irs)
@@ -183,12 +202,20 @@ async def emit_code(req: EmitRequest):
         # return EmitResponse(
         #     session_id = req.session_id,
         #     files      = files,   # { "Page.tsx": "...", "types.ts": "...", "api.ts": "..." }
+        #     audit_report = build_emit_audit_report(...),
         # )
+
+        audit_report = build_emit_audit_report(
+            state.fields,
+            gate_mode=settings.quality_gate_mode,
+            enabled=settings.react_quality_audit_enabled,
+        )
 
         # POC placeholder
         return EmitResponse(
             session_id = req.session_id,
             files      = {"Page.tsx": "// placeholder — wire emitter in Sprint 3"},
+            audit_report = audit_report,
         )
 
     except Exception as e:
@@ -249,12 +276,31 @@ async def get_session_status(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
     state = get_session(session_id)
+    settings = get_settings()
+
+    gate = evaluate_quality_gate(
+        state.fields,
+        gate_mode=settings.quality_gate_mode,
+    )
+    critical_messages = [item.message for item in gate.critical_violations]
+    warning_messages = [item.message for item in gate.warning_findings]
+    blocking_messages = [item.message for item in gate.blocking_findings]
 
     return SessionStatusResponse(
         session_id   = session_id,
         mode         = state.mode,
         missing      = state.missing,
-        guideline_violations = state.guideline_violations,
+        guideline_violations = blocking_messages,
+        quality      = SessionStatusResponse.QualitySummary(
+            gate_mode = gate.gate_mode,
+            is_blocked = gate.is_blocked,
+            critical_count = len(gate.critical_violations),
+            warning_count = len(gate.warning_findings),
+            blocking_count = len(gate.blocking_findings),
+            critical_violations = critical_messages,
+            warning_findings = warning_messages,
+            blocking_findings = blocking_messages,
+        ),
         confirmed    = state.confirmed,
         active_agent = state.active_agent,
         turns        = state.free_chat_turns(),

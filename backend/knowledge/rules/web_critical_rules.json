@@ -1,0 +1,108 @@
+[
+  {
+    "id": "critical_keyboard_navigation",
+    "title": "Keyboard Navigation Required",
+    "description": "Should all interactive controls support keyboard navigation (Tab, Enter, Space, Escape)?",
+    "severity": "critical",
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html"
+    ],
+    "checks": [
+      "a11y.keyboard_navigation == true",
+      "interactive_elements_have_focus_visible"
+    ],
+    "metadata": {
+      "slot": "accessibility"
+    }
+  },
+  {
+    "id": "critical_icon_controls_labeled",
+    "title": "Icon-only Controls Need Labels",
+    "description": "Icon-only buttons must provide an accessible name (aria-label or equivalent).",
+    "severity": "critical",
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html"
+    ],
+    "checks": [
+      "a11y.required_labels.length > 0"
+    ],
+    "metadata": {
+      "slot": "accessibility"
+    }
+  },
+  {
+    "id": "critical_destructive_action_confirmation",
+    "title": "Destructive Actions Require Confirmation",
+    "description": "Should destructive actions require confirmation or undo?",
+    "severity": "critical",
+    "references": [
+      "https://www.nngroup.com/articles/confirmation-dialog/"
+    ],
+    "checks": [
+      "destructive_actions_have_confirmation_or_undo"
+    ],
+    "metadata": {
+      "slot": "actions"
+    }
+  },
+  {
+    "id": "critical_forms_labeled_and_typed",
+    "title": "Forms Must Be Labeled and Typed",
+    "description": "Forms need explicit labels, suitable input types/inputmode, and autocomplete intent where applicable.",
+    "severity": "critical",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input"
+    ],
+    "checks": [
+      "constraints includes forms_labeled"
+    ],
+    "metadata": {
+      "slot": "constraints"
+    }
+  },
+  {
+    "id": "critical_reduced_motion_support",
+    "title": "Respect Prefers Reduced Motion",
+    "description": "Should motion honor prefers-reduced-motion (reduced or disabled animation)?",
+    "severity": "critical",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion"
+    ],
+    "checks": [
+      "constraints includes prefers_reduced_motion"
+    ],
+    "metadata": {
+      "slot": "constraints"
+    }
+  },
+  {
+    "id": "critical_intl_user_formatting",
+    "title": "Locale-aware User Formatting",
+    "description": "Confirm locale formatting: use Intl.DateTimeFormat / Intl.NumberFormat for user-facing dates and numbers.",
+    "severity": "critical",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl"
+    ],
+    "checks": [
+      "constraints includes intl_formatting"
+    ],
+    "metadata": {
+      "slot": "constraints"
+    }
+  },
+  {
+    "id": "critical_url_state_sync_for_filters",
+    "title": "Filter and Pagination State Sync",
+    "description": "When filters, sorting, or pagination are present, state should be reflected in URL query params.",
+    "severity": "critical",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams"
+    ],
+    "checks": [
+      "constraints includes url_state_sync when filter/sort/pagination used"
+    ],
+    "metadata": {
+      "slot": "constraints"
+    }
+  }
+]

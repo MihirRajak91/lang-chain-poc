@@ -4,8 +4,10 @@ import uuid
 from fastapi             import APIRouter, WebSocket, WebSocketDisconnect
 from backend.agents.conversation.models import ConversationState
 from backend.core.logger import get_logger
+from backend.core.setting import get_settings
 from backend.core.session import get_session, save_session, clear_session
 from backend.agents.conversation.graph import build_graph
+from backend.agents.conversation.validators import QualityGateEvaluation, evaluate_quality_gate
 
 logger    = get_logger(__name__)
 ws_router = APIRouter()
@@ -42,6 +44,8 @@ async def ws_chat(websocket: WebSocket):
     Server sends back per turn:
         { "type": "message",      "content": "...",  "agent": "..." }
         { "type": "field_update", "field": "...",    "value": "..." }
+        { "type": "quality_finding", ... }
+        { "type": "spec_snapshot", ... }
         { "type": "mode_change",  "mode": "...",               }
         { "type": "done",         "ui_plan": { ... }            }
         { "type": "error",        "detail": "..."               }
@@ -74,6 +78,11 @@ async def ws_chat(websocket: WebSocket):
             state = get_session(session_id)
             prev_fields = state.fields.model_dump()
             prev_mode   = state.mode
+            settings = get_settings()
+            prev_gate = evaluate_quality_gate(
+                state.fields,
+                gate_mode=settings.quality_gate_mode,
+            )
 
             # ── Append user message ───────────────────────────────────────────
             state.add_message("user", user_message)
@@ -119,6 +128,28 @@ async def ws_chat(websocket: WebSocket):
                         "Field update sent | session: %s | %s = %s",
                         session_id, field, value,
                     )
+
+            # ── Send quality finding deltas ───────────────────────────────────
+            current_gate = evaluate_quality_gate(
+                state.fields,
+                gate_mode=settings.quality_gate_mode,
+            )
+            for finding_event in _build_quality_finding_events(
+                session_id=session_id,
+                previous=prev_gate,
+                current=current_gate,
+            ):
+                await _send(websocket, finding_event)
+
+            # ── Send full per-turn spec snapshot ──────────────────────────────
+            await _send(
+                websocket,
+                _build_spec_snapshot_payload(
+                    session_id=session_id,
+                    state=state,
+                    gate=current_gate,
+                ),
+            )
 
             # ── Send mode change ──────────────────────────────────────────────
             if state.mode != prev_mode:
@@ -178,3 +209,78 @@ def _count_turns(session_id: str) -> int:
         return 0
     from backend.core.session import get_session as _gs
     return _gs(session_id).free_chat_turns()
+
+
+def _issue_key(issue) -> tuple[str, str, str]:
+    return (issue.severity, issue.slot, issue.message)
+
+
+def _build_quality_finding_events(
+    session_id: str,
+    previous: QualityGateEvaluation,
+    current: QualityGateEvaluation,
+) -> list[dict]:
+    prev_map = {_issue_key(item): item for item in [*previous.critical_violations, *previous.warning_findings]}
+    curr_map = {_issue_key(item): item for item in [*current.critical_violations, *current.warning_findings]}
+    prev_blocking = {_issue_key(item) for item in previous.blocking_findings}
+    curr_blocking = {_issue_key(item) for item in current.blocking_findings}
+
+    payloads: list[dict] = []
+
+    for key in sorted(curr_map.keys() - prev_map.keys()):
+        severity, slot, message = key
+        payloads.append(
+            {
+                "type": "quality_finding",
+                "session_id": session_id,
+                "status": "open",
+                "severity": severity,
+                "slot": slot,
+                "message": message,
+                "blocking": key in curr_blocking,
+                "gate_mode": current.gate_mode,
+            }
+        )
+
+    for key in sorted(prev_map.keys() - curr_map.keys()):
+        severity, slot, message = key
+        payloads.append(
+            {
+                "type": "quality_finding",
+                "session_id": session_id,
+                "status": "resolved",
+                "severity": severity,
+                "slot": slot,
+                "message": message,
+                "blocking": key in prev_blocking,
+                "gate_mode": current.gate_mode,
+            }
+        )
+
+    return payloads
+
+
+def _build_spec_snapshot_payload(
+    session_id: str,
+    state: ConversationState,
+    gate: QualityGateEvaluation,
+) -> dict:
+    return {
+        "type": "spec_snapshot",
+        "session_id": session_id,
+        "mode": state.mode,
+        "missing": state.missing,
+        "spec": state.fields.model_dump(exclude_none=True),
+        "quality": {
+            "gate_mode": gate.gate_mode,
+            "is_blocked": gate.is_blocked,
+            "critical_count": len(gate.critical_violations),
+            "warning_count": len(gate.warning_findings),
+            "blocking_count": len(gate.blocking_findings),
+            "critical_violations": [item.message for item in gate.critical_violations],
+            "warning_findings": [item.message for item in gate.warning_findings],
+            "blocking_findings": [item.message for item in gate.blocking_findings],
+        },
+        "guideline_violations": state.guideline_violations,
+        "recommendation_snapshot": state.recommendation_snapshot,
+    }

@@ -70,6 +70,9 @@ OUTPUT SCHEMA:
   "actions": list of action objects or null,
   "feedback": list of feedback objects or null,
   "style": style object or null,
+  "product_context": product context object or null,
+  "design_intent": design intent object or null,
+  "design_system": design system object or null,
   "accessibility": accessibility object or null,
   "constraints": list of strings or null
 }
@@ -144,6 +147,44 @@ FIELD RULES:
     "color_intent": string or null  (e.g. "neutral", "brand-blue", "high-contrast")
   }
   Only include keys the user explicitly mentioned. If nothing stated → null.
+
+"product_context":
+  {
+    "product_type": string or null (e.g. "internal dashboard", "customer portal"),
+    "domain": string or null (e.g. "healthcare", "fintech", "ecommerce"),
+    "audience": string or null (e.g. "ops analysts", "clinic staff", "end customers"),
+    "primary_platform": "web" | "mobile_web" | "desktop_web" | null,
+    "notes": string or null
+  }
+  "This is an internal ops dashboard for clinic staff" ->
+    {"product_type":"internal dashboard","domain":"healthcare","audience":"clinic staff"}
+  Only extract explicitly stated context.
+
+"design_intent":
+  {
+    "core_tasks": list of strings,
+    "visual_tone": string or null,
+    "usability_priorities": list of strings,
+    "trust_signals": list of strings,
+    "notes": string or null
+  }
+  "Primary task is triage and quick review" -> core_tasks includes "triage", "quick review"
+  "Must feel trustworthy and low cognitive load" ->
+    usability_priorities includes "low_cognitive_load", trust_signals includes "trustworthy"
+  Do not infer priorities unless clearly stated.
+
+"design_system":
+  {
+    "system_name": string or null,
+    "component_library": string or null,
+    "icon_set": string or null,
+    "token_source": string or null,
+    "tailwind_preset": string or null,
+    "notes": string or null
+  }
+  "Use shadcn/ui and lucide icons with our tailwind tokens" ->
+    {"component_library":"shadcn/ui","icon_set":"lucide","token_source":"tailwind_tokens"}
+  If no explicit design system/tooling preference is stated -> null.
 
 "accessibility":
   {

@@ -1,0 +1,97 @@
+[
+  {
+    "id": "palette_neutral_slate",
+    "title": "Neutral Slate",
+    "description": "Balanced grayscale palette suitable for data-heavy products and long-session usage.",
+    "tags": ["neutral", "dashboard", "b2b"],
+    "references": [
+      "https://tailwindcss.com/docs/customizing-colors"
+    ],
+    "metadata": {
+      "background": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "text_primary": "#0F172A",
+      "text_secondary": "#334155",
+      "accent": "#2563EB",
+      "success": "#16A34A",
+      "warning": "#D97706",
+      "danger": "#DC2626"
+    }
+  },
+  {
+    "id": "palette_healthcare_clean",
+    "title": "Healthcare Clean",
+    "description": "Soft clinical neutrals with trustworthy blue accents and clear state colors.",
+    "tags": ["healthcare", "clinical", "trust"],
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html"
+    ],
+    "metadata": {
+      "background": "#F7FBFF",
+      "surface": "#FFFFFF",
+      "text_primary": "#0B1F33",
+      "text_secondary": "#35556E",
+      "accent": "#0B5FFF",
+      "success": "#127A5A",
+      "warning": "#B96A00",
+      "danger": "#B42318"
+    }
+  },
+  {
+    "id": "palette_finance_professional",
+    "title": "Finance Professional",
+    "description": "Mature palette for fintech and enterprise reporting interfaces.",
+    "tags": ["finance", "enterprise", "reporting"],
+    "references": [
+      "https://material.io/design/color/the-color-system.html"
+    ],
+    "metadata": {
+      "background": "#F5F7FA",
+      "surface": "#FFFFFF",
+      "text_primary": "#101828",
+      "text_secondary": "#344054",
+      "accent": "#1D4ED8",
+      "success": "#15803D",
+      "warning": "#B45309",
+      "danger": "#B91C1C"
+    }
+  },
+  {
+    "id": "palette_warm_commerce",
+    "title": "Warm Commerce",
+    "description": "Friendly and conversion-oriented palette suitable for ecommerce UI surfaces.",
+    "tags": ["ecommerce", "consumer", "conversion"],
+    "references": [
+      "https://www.nngroup.com/articles/color-contrast/"
+    ],
+    "metadata": {
+      "background": "#FFFBF7",
+      "surface": "#FFFFFF",
+      "text_primary": "#1F2937",
+      "text_secondary": "#4B5563",
+      "accent": "#EA580C",
+      "success": "#16A34A",
+      "warning": "#D97706",
+      "danger": "#DC2626"
+    }
+  },
+  {
+    "id": "palette_high_contrast_a11y",
+    "title": "High Contrast A11y",
+    "description": "High-contrast palette for accessibility-sensitive products and low-vision support.",
+    "tags": ["a11y", "high_contrast", "wcag"],
+    "references": [
+      "https://www.w3.org/WAI/WCAG22/Understanding/contrast-enhanced.html"
+    ],
+    "metadata": {
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "text_primary": "#000000",
+      "text_secondary": "#1F2937",
+      "accent": "#0033CC",
+      "success": "#006400",
+      "warning": "#8B4513",
+      "danger": "#8B0000"
+    }
+  }
+]
