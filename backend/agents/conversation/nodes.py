@@ -1,9 +1,9 @@
 # backend/agents/conversation/nodes.py
 
-import json
 from backend.core.logger import get_logger
 from .models import ConversationState, UIPlan
 from .agents  import AGENTS
+from .parsing import parse_json_object_with_fallback, strip_json_fences
 from .prompts import (
     CONVERSATIONALIST_SYSTEM,
     EXTRACTOR_SYSTEM,
@@ -11,6 +11,17 @@ from .prompts import (
     SUMMARISER_SYSTEM,
     FIELD_QUESTIONS,
 )
+from .validators import evaluate_guideline_critical
+
+EXTRACTOR_PARSE_MAX_ATTEMPTS = 2
+EXTRACTOR_RETRY_INSTRUCTION = """
+IMPORTANT:
+- Return exactly one valid JSON object.
+- Do not wrap output in markdown fences.
+- Do not include commentary.
+- Use null for unknown fields.
+- Never leave trailing commas.
+""".strip()
 
 # Maps conversation field names → RequirementSpec slot names
 FIELD_TO_SLOT = {
@@ -20,6 +31,8 @@ FIELD_TO_SLOT = {
     "actions":      "actions",
     "feedback":     "feedback",
     "style":        "style",
+    "accessibility":"accessibility",
+    "constraints":  "constraints",
 }
 
 
@@ -51,43 +64,56 @@ def extractor_node(state: ConversationState) -> ConversationState:
 
     recent_messages = _get_recent_messages(state, n_user_turns=2)
 
-    response = agent.model.invoke([
-        {"role": "system", "content": EXTRACTOR_SYSTEM},
-        *recent_messages,
-    ])
+    extracted = _extract_with_retry(agent, recent_messages, logger)
+    if extracted is None:
+        return state
 
-    raw = _strip_fences(response.content)
+    updated = _merge_into_spec(state, extracted, logger)
 
-    try:
-        extracted = json.loads(raw)
-        if not isinstance(extracted, dict):
-            logger.warning("Extractor output was not a JSON object — skipping")
-            return state
-
-        updated = _merge_into_spec(state, extracted, logger)
-
-        if updated:
-            logger.info("Updated slots: %s", ", ".join(updated))
-        else:
-            logger.debug("No new slots updated this turn")
-
-    except json.JSONDecodeError as e:
-        logger.warning("Extractor JSON parse failed: %s | raw: %.120s", e, raw)
+    if updated:
+        logger.info("Updated slots: %s", ", ".join(updated))
+    else:
+        logger.debug("No new slots updated this turn")
 
     return state
 
 
 def _strip_fences(raw: str) -> str:
-    raw = raw.strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        inner = lines[1:] if lines[0].startswith("```") else lines
-        raw = "\n".join(inner)
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return raw.strip()
+    # Backward-compatible wrapper for legacy callers.
+    return strip_json_fences(raw)
+
+
+def _extract_with_retry(agent, recent_messages: list[dict], logger) -> dict | None:
+    """
+    Parse extractor JSON robustly.
+    1) Try normal extractor prompt.
+    2) Retry once with strict JSON-only instruction if parsing fails.
+    """
+    for attempt in range(1, EXTRACTOR_PARSE_MAX_ATTEMPTS + 1):
+        system_prompt = EXTRACTOR_SYSTEM
+        if attempt > 1:
+            system_prompt = f"{EXTRACTOR_SYSTEM}\n\n{EXTRACTOR_RETRY_INSTRUCTION}"
+
+        response = agent.model.invoke([
+            {"role": "system", "content": system_prompt},
+            *recent_messages,
+        ])
+
+        raw = _strip_fences(response.content)
+        extracted = parse_json_object_with_fallback(raw)
+        if extracted is not None:
+            if attempt > 1:
+                logger.info("Extractor JSON parse recovered on retry attempt %d", attempt)
+            return extracted
+
+        logger.warning(
+            "Extractor JSON parse failed (attempt %d/%d) | raw: %.120s",
+            attempt,
+            EXTRACTOR_PARSE_MAX_ATTEMPTS,
+            raw,
+        )
+
+    return None
 
 
 def _get_recent_messages(state: ConversationState, n_user_turns: int = 2) -> list[dict]:
@@ -187,6 +213,33 @@ def _merge_into_spec(
             logger.warning("Failed to merge style: %s", exc)
             spec.update_slot_status("style", "uncertain", 0.0)
 
+    # ── accessibility ────────────────────────────────────────────────────────
+    accessibility = extracted.get("accessibility")
+    if accessibility and isinstance(accessibility, dict):
+        try:
+            changed = spec.merge_accessibility(accessibility)
+            if changed:
+                spec.update_slot_status("accessibility", "complete")
+                updated.append("accessibility")
+                logger.debug("  accessibility → %s", accessibility)
+        except Exception as exc:
+            logger.warning("Failed to merge accessibility: %s", exc)
+            spec.update_slot_status("accessibility", "uncertain", 0.0)
+
+    # ── constraints ──────────────────────────────────────────────────────────
+    constraints = extracted.get("constraints")
+    if constraints:
+        try:
+            constraints_raw = constraints if isinstance(constraints, list) else []
+            changed = spec.merge_constraints(constraints_raw)
+            if changed:
+                spec.update_slot_status("constraints", "complete")
+                updated.append("constraints")
+                logger.debug("  constraints → %s", changed)
+        except Exception as exc:
+            logger.warning("Failed to merge constraints: %s", exc)
+            spec.update_slot_status("constraints", "uncertain", 0.0)
+
     return updated
 
 
@@ -242,18 +295,28 @@ def gap_check_node(state: ConversationState) -> ConversationState:
 
     prev_mode = state.mode
 
-    if (
-        state.free_chat_turns() >= settings.free_chat_turn_threshold
-        and state.missing
-        and state.mode == "free_chat"
-    ):
-        state.mode = "fill_gaps"
+    guideline_issues = evaluate_guideline_critical(state.fields)
+    state.guideline_violations = [issue.message for issue in guideline_issues]
 
-    state.current_gap = state.missing[0] if state.missing else None
+    if state.missing:
+        if (
+            state.free_chat_turns() >= settings.free_chat_turn_threshold
+            and state.mode == "free_chat"
+        ):
+            state.mode = "fill_gaps"
+        state.current_gap = state.missing[0]
+    elif guideline_issues:
+        state.mode = "fill_gaps"
+        state.current_gap = guideline_issues[0].slot
+    else:
+        if state.mode == "fill_gaps":
+            state.mode = "free_chat"
+        state.current_gap = None
 
     logger.info(
-        "Missing: [%s] | Mode: %s%s",
+        "Missing: [%s] | Compliance issues: %d | Mode: %s%s",
         ", ".join(state.missing) if state.missing else "none",
+        len(guideline_issues),
         state.mode,
         f" (switched from {prev_mode})" if state.mode != prev_mode else "",
     )
@@ -267,12 +330,20 @@ def fill_gap_node(state: ConversationState) -> ConversationState:
     logger = get_logger(__name__, agent=agent.name)
     state.active_agent = agent.name
 
-    # Map slot name back to conversation field name for the question lookup
-    slot    = state.missing[0]
+    # Choose missing required slot first; then unresolved compliance question.
+    if state.missing:
+        slot = state.missing[0]
+    else:
+        slot = state.current_gap or "constraints"
+
     field   = next((k for k, v in FIELD_TO_SLOT.items() if v == slot), slot)
     question = FIELD_QUESTIONS.get(field, FIELD_QUESTIONS.get(slot, "Can you tell me more?"))
+    if not state.missing and state.guideline_violations:
+        question = state.guideline_violations[0]
 
     missing_slots = set(state.missing)
+    if not state.missing and state.current_gap:
+        missing_slots.add(state.current_gap)
     filled_slots = [k for k, mapped in FIELD_TO_SLOT.items() if mapped not in missing_slots]
     filled_str    = ", ".join(filled_slots) if filled_slots else "nothing yet"
 

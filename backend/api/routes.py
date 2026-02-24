@@ -58,6 +58,7 @@ class SessionStatusResponse(BaseModel):
     session_id:   str
     mode:         str
     missing:      list[str]
+    guideline_violations: list[str]
     confirmed:    bool
     active_agent: str | None
     turns:        int
@@ -253,6 +254,7 @@ async def get_session_status(session_id: str):
         session_id   = session_id,
         mode         = state.mode,
         missing      = state.missing,
+        guideline_violations = state.guideline_violations,
         confirmed    = state.confirmed,
         active_agent = state.active_agent,
         turns        = state.free_chat_turns(),

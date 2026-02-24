@@ -18,10 +18,10 @@ def _is_confirmation(state: ConversationState) -> bool:
 def route_after_gap_check(state: ConversationState) -> str:
     if state.mode == "confirm":
         return "done_node" if _is_confirmation(state) else "confirm_node"
-    if not state.missing:
-        return "confirm_node"
     if state.mode == "fill_gaps":
         return "fill_gap_node"
+    if not state.missing:
+        return "confirm_node"
     return "chat_node"
 
 def route_after_confirm(state: ConversationState) -> str:

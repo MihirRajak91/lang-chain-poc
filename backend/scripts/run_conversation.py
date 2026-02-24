@@ -121,6 +121,12 @@ def print_state(state: ConversationState):
     else:
         print(f"  {C.DIM}missing      {C.RESET}{C.GREEN}none — all fields collected{C.RESET}")
 
+    if state.guideline_violations:
+        print(f"  {C.DIM}compliance   {C.RESET}{C.YELLOW}{len(state.guideline_violations)} open issue(s){C.RESET}")
+        print(f"  {C.DIM}next issue   {C.RESET}{state.guideline_violations[0]}")
+    else:
+        print(f"  {C.DIM}compliance   {C.RESET}{C.GREEN}clear{C.RESET}")
+
     divider()
     print()
 

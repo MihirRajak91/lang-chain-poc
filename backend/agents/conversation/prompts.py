@@ -35,6 +35,10 @@ REQUIRED SLOTS (collect in this order):
 6. style        — Theme (light/dark), density (compact/comfortable/spacious),
                   color intent (neutral, brand, high-contrast)
 
+COMPLIANCE CHECKS (capture before final confirmation):
+- accessibility: keyboard navigation + aria labels for icon-only controls
+- constraints: URL state sync, reduced-motion support, and Intl formatting usage
+
 CONVERSATION RULES:
 - Ask ONE focused question per turn. Never ask two questions at once.
 - If the user gives a vague layout answer ("somewhere on the page", "somewhere nice"),
@@ -65,7 +69,9 @@ OUTPUT SCHEMA:
   "entities": list of entity objects or null,
   "actions": list of action objects or null,
   "feedback": list of feedback objects or null,
-  "style": style object or null
+  "style": style object or null,
+  "accessibility": accessibility object or null,
+  "constraints": list of strings or null
 }
 
 FIELD RULES:
@@ -139,6 +145,25 @@ FIELD RULES:
   }
   Only include keys the user explicitly mentioned. If nothing stated → null.
 
+"accessibility":
+  {
+    "keyboard_navigation": boolean or null,
+    "semantic_landmarks": boolean or null,
+    "required_labels": list of strings,
+    "focus_notes": string or null,
+    "contrast_notes": string or null
+  }
+  "icon-only close button labelled close dialog" -> required_labels: ["close dialog"]
+  "keyboard only navigation required" -> keyboard_navigation: true
+
+"constraints":
+  canonical tokens only:
+  - "forms_labeled"
+  - "url_state_sync"
+  - "prefers_reduced_motion"
+  - "intl_formatting"
+  Extract these only when user explicitly confirms them.
+
 STRICTNESS RULES:
 - If in doubt → null. Never guess or infer.
 - Only extract from USER messages. Ignore assistant messages.
@@ -205,5 +230,13 @@ FIELD_QUESTIONS = {
         "What is the visual tone — light or dark theme, "
         "compact or spacious layout, any color intent "
         "like neutral/clinical, brand color, or high-contrast?"
+    ),
+    "accessibility": (
+        "For accessibility, should all controls support keyboard navigation, "
+        "and what aria-labels are needed for icon-only buttons?"
+    ),
+    "constraints": (
+        "Should we enforce URL-synced state, prefers-reduced-motion behavior, "
+        "and Intl formatting for dates/numbers?"
     ),
 }

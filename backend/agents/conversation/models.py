@@ -215,6 +215,17 @@ class RequirementSpec(BaseModel):
             .replace(" ", "_")
         )
 
+    @staticmethod
+    def _normalize_constraint(value: Any) -> Optional[str]:
+        cleaned = RequirementSpec._clean_str(value)
+        if not cleaned:
+            return None
+        return (
+            cleaned.lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+
     def merge_entities(self, incoming: list[dict]) -> list[str]:
         """Merge incoming entity dicts into self.entities. Returns updated names."""
         updated: list[str] = []
@@ -497,6 +508,51 @@ class RequirementSpec(BaseModel):
                 changed = True
         return changed
 
+    def merge_accessibility(self, incoming: dict) -> bool:
+        """Merge accessibility dict into self.accessibility."""
+        if not isinstance(incoming, dict):
+            return False
+
+        changed = False
+
+        for attr in ["keyboard_navigation", "semantic_landmarks"]:
+            value = incoming.get(attr)
+            if isinstance(value, bool) and getattr(self.accessibility, attr) != value:
+                setattr(self.accessibility, attr, value)
+                changed = True
+
+        new_labels = [
+            label
+            for label in self._clean_str_list(incoming.get("required_labels"))
+            if label not in self.accessibility.required_labels
+        ]
+        if new_labels:
+            self.accessibility.required_labels += new_labels
+            changed = True
+
+        for attr in ["focus_notes", "contrast_notes"]:
+            value = self._clean_str(incoming.get(attr))
+            if value and getattr(self.accessibility, attr) != value:
+                setattr(self.accessibility, attr, value)
+                changed = True
+
+        return changed
+
+    def merge_constraints(self, incoming: list[Any]) -> list[str]:
+        """Merge canonical guideline constraints into self.constraints."""
+        if not isinstance(incoming, list):
+            return []
+
+        updated: list[str] = []
+        for item in incoming:
+            normalized = self._normalize_constraint(item)
+            if not normalized:
+                continue
+            if normalized not in self.constraints:
+                self.constraints.append(normalized)
+                updated.append(normalized)
+        return updated
+
     # ── Human-readable summary for confirm_node ───────────────────────────────
 
     def summary(self) -> str:
@@ -548,6 +604,18 @@ class RequirementSpec(BaseModel):
         style_str = ", ".join(p for p in style_parts if p) or "—"
         lines.append(f"\n**Style:** {style_str}")
 
+        a = self.accessibility
+        a11y_parts = [
+            f"keyboard_navigation={a.keyboard_navigation}" if a.keyboard_navigation is not None else None,
+            f"semantic_landmarks={a.semantic_landmarks}" if a.semantic_landmarks is not None else None,
+            f"required_labels={', '.join(a.required_labels)}" if a.required_labels else None,
+        ]
+        a11y_str = ", ".join(p for p in a11y_parts if p) or "—"
+        lines.append(f"\n**Accessibility:** {a11y_str}")
+
+        constraints_str = ", ".join(self.constraints) if self.constraints else "—"
+        lines.append(f"\n**Guideline Constraints:** {constraints_str}")
+
         return "\n".join(lines)
 
 
@@ -577,6 +645,7 @@ class ConversationState(BaseModel):
     current_gap:  Optional[str]   = None
     confirmed:    bool            = False
     active_agent: Optional[str]   = None
+    guideline_violations: list[str] = Field(default_factory=list)
 
     @property
     def missing(self) -> list[str]:
