@@ -1,34 +1,29 @@
 {
-  "page_goal": "Review patient rows and calculate BMI quickly.",
+  "page_goal": "Calculate BMI for users from stored data",
   "layout_zones": [
-    {
-      "zone_id": "zone_table",
-      "component": "DataTable",
-      "anchor": "full-width"
-    },
     {
       "zone_id": "zone_button",
       "component": "PrimaryButton",
       "anchor": "center"
-    },
-    {
-      "zone_id": "zone_modal",
-      "component": "Modal",
-      "anchor": "center",
-      "z_layer": "overlay"
     }
   ],
-  "components": [],
+  "components": [
+    {
+      "component_id": "cmp_button_1",
+      "kind": "PrimaryButton",
+      "label": "Calculate BMI",
+      "zone_id": "zone_button",
+      "children": [],
+      "props": {}
+    }
+  ],
   "entities": [
     {
-      "name": "patients",
+      "name": "users",
       "fields": [
-        "id",
-        "full_name",
-        "age",
+        "name",
         "height_cm",
-        "weight_kg",
-        "bmi"
+        "weight_kg"
       ],
       "computed": [],
       "display_fields": [],
@@ -37,25 +32,18 @@
   ],
   "actions": [
     {
-      "action_id": "load_patient_detail",
-      "trigger": "row_select",
-      "operation": "load_patient_detail",
-      "payload": {},
-      "validation_rules": [],
-      "requires_confirmation": false
-    },
-    {
       "action_id": "calculate_bmi",
       "trigger": "button_click",
+      "target_component_id": "cmp_button_1",
       "operation": "calculate_bmi",
       "payload": {},
       "validation_rules": [],
       "requires_confirmation": false
     },
     {
-      "action_id": "save_note",
-      "trigger": "form_submit",
-      "operation": "save_note",
+      "action_id": "display_bmi",
+      "trigger": "button_click",
+      "operation": "display_bmi",
       "payload": {},
       "validation_rules": [],
       "requires_confirmation": false
@@ -64,27 +52,18 @@
   "feedback": [
     {
       "action_id": "calculate_bmi",
-      "loading_indicator": "spinner",
-      "success_message": "BMI calculated",
       "ui_updates": [
-        "display_result_inline",
-        "refresh_table"
+        "display_result_inline"
       ]
     }
   ],
   "style": {
-    "tone": "clinical",
-    "theme": "light",
-    "density": "comfortable",
-    "color_intent": "high-contrast"
+    "color_intent": "green"
   },
   "accessibility": {
     "keyboard_navigation": true,
-    "semantic_landmarks": true,
     "required_labels": [
-      "Close dialog",
-      "Open filters",
-      "Main menu"
+      "aria-label"
     ]
   },
   "responsive": {
@@ -93,8 +72,6 @@
     "hidden_on_small": []
   },
   "constraints": [
-    "forms_labeled",
-    "url_state_sync",
     "prefers_reduced_motion",
     "intl_formatting"
   ]

@@ -190,7 +190,13 @@ class RequirementSpec(BaseModel):
 
     # Required slots for IR generation — others are optional
     _REQUIRED: list[str] = [
-        "page_goal", "layout_zones", "entities", "actions", "feedback", "style"
+        "page_goal",
+        "layout_zones",
+        "components",
+        "entities",
+        "actions",
+        "feedback",
+        "style",
     ]
 
     # ── Completeness ──────────────────────────────────────────────────────────
@@ -265,6 +271,21 @@ class RequirementSpec(BaseModel):
             .replace("-", "_")
             .replace(" ", "_")
         )
+
+    def _next_component_id(
+        self,
+        kind: str,
+        existing_ids: set[str],
+        *,
+        start: int = 1,
+    ) -> str:
+        base = f"cmp_{self._slug(kind or 'component')}"
+        index = max(start, 1)
+        candidate = f"{base}_{index}"
+        while candidate in existing_ids:
+            index += 1
+            candidate = f"{base}_{index}"
+        return candidate
 
     def merge_entities(self, incoming: list[dict]) -> list[str]:
         """Merge incoming entity dicts into self.entities. Returns updated names."""
@@ -398,6 +419,177 @@ class RequirementSpec(BaseModel):
                     continue
 
         return updated
+
+    def merge_components(self, incoming: list[dict]) -> list[str]:
+        """Merge incoming component dicts. Returns updated component_ids."""
+        updated: list[str] = []
+        index = {c.component_id.lower(): i for i, c in enumerate(self.components)}
+        zone_index = {
+            c.zone_id.lower(): i
+            for i, c in enumerate(self.components)
+            if c.zone_id
+        }
+        existing_ids = {c.component_id for c in self.components}
+
+        for raw in incoming:
+            if not isinstance(raw, dict):
+                continue
+
+            kind = (
+                self._clean_str(raw.get("kind"))
+                or self._clean_str(raw.get("component"))
+                or self._clean_str(raw.get("type"))
+                or "UnknownComponent"
+            )
+            zone_id = self._clean_str(raw.get("zone_id"))
+            incoming_id = self._clean_str(raw.get("component_id"))
+            matched_idx: Optional[int] = None
+
+            if incoming_id and incoming_id.lower() in index:
+                matched_idx = index[incoming_id.lower()]
+            elif zone_id and zone_id.lower() in zone_index:
+                matched_idx = zone_index[zone_id.lower()]
+
+            if matched_idx is not None:
+                component = self.components[matched_idx]
+                changed = False
+                old_zone = component.zone_id
+                old_component_id = component.component_id
+
+                # If an explicit id arrives for an auto-seeded zone component,
+                # adopt that id to avoid duplicate entries for the same zone.
+                if (
+                    incoming_id
+                    and incoming_id != component.component_id
+                    and incoming_id.lower() not in index
+                ):
+                    component.component_id = incoming_id
+                    existing_ids.discard(old_component_id)
+                    existing_ids.add(incoming_id)
+                    index.pop(old_component_id.lower(), None)
+                    index[incoming_id.lower()] = matched_idx
+
+                    for item in self.components:
+                        item.children = [
+                            incoming_id if child == old_component_id else child
+                            for child in item.children
+                        ]
+                    for action in self.actions:
+                        if action.target_component_id == old_component_id:
+                            action.target_component_id = incoming_id
+                    changed = True
+
+                if kind and component.kind != kind:
+                    component.kind = kind
+                    changed = True
+
+                label = self._clean_str(raw.get("label"))
+                if label and component.label != label:
+                    component.label = label
+                    changed = True
+
+                if zone_id and component.zone_id != zone_id:
+                    component.zone_id = zone_id
+                    changed = True
+
+                if old_zone and old_zone.lower() in zone_index and zone_index[old_zone.lower()] == matched_idx:
+                    zone_index.pop(old_zone.lower(), None)
+                if component.zone_id:
+                    zone_index[component.zone_id.lower()] = matched_idx
+
+                new_children = [
+                    child
+                    for child in self._clean_str_list(raw.get("children"))
+                    if child not in component.children
+                ]
+                if new_children:
+                    component.children += new_children
+                    changed = True
+
+                props = raw.get("props")
+                if isinstance(props, dict):
+                    for prop_key, prop_value in props.items():
+                        clean_key = self._clean_str(prop_key)
+                        clean_value = self._clean_str(prop_value)
+                        if clean_key and clean_value and component.props.get(clean_key) != clean_value:
+                            component.props[clean_key] = clean_value
+                            changed = True
+
+                if changed and component.component_id not in updated:
+                    updated.append(component.component_id)
+                continue
+
+            component_id = incoming_id or self._next_component_id(
+                kind,
+                existing_ids,
+                start=len(existing_ids) + 1,
+            )
+
+            payload = {
+                "component_id": component_id,
+                "kind": kind,
+                "label": self._clean_str(raw.get("label")),
+                "zone_id": zone_id,
+                "children": self._clean_str_list(raw.get("children")),
+                "props": {},
+            }
+            props = raw.get("props")
+            if isinstance(props, dict):
+                payload["props"] = {
+                    key: value
+                    for key, value in (
+                        (self._clean_str(prop_key), self._clean_str(prop_value))
+                        for prop_key, prop_value in props.items()
+                    )
+                    if key and value
+                }
+
+            try:
+                self.components.append(ComponentSpec(**payload))
+                existing_ids.add(component_id)
+                index[component_id.lower()] = len(self.components) - 1
+                if zone_id:
+                    zone_index[zone_id.lower()] = len(self.components) - 1
+                updated.append(component_id)
+            except Exception:
+                continue
+
+        return updated
+
+    def ensure_components_from_layout(self) -> list[str]:
+        """
+        Ensures each layout zone has at least one mapped component.
+        Returns component IDs created from layout defaults.
+        """
+        created: list[str] = []
+        existing_ids = {c.component_id for c in self.components}
+        zone_to_component = {
+            c.zone_id: c.component_id
+            for c in self.components
+            if c.zone_id
+        }
+
+        for zone in self.layout_zones:
+            if zone.zone_id in zone_to_component:
+                continue
+
+            component_id = self._next_component_id(
+                zone.component,
+                existing_ids,
+                start=len(existing_ids) + 1,
+            )
+            self.components.append(
+                ComponentSpec(
+                    component_id=component_id,
+                    kind=zone.component,
+                    zone_id=zone.zone_id,
+                )
+            )
+            existing_ids.add(component_id)
+            zone_to_component[zone.zone_id] = component_id
+            created.append(component_id)
+
+        return created
 
     def merge_actions(self, incoming: list[dict]) -> list[str]:
         """Merge incoming action dicts. Returns updated action_ids."""
@@ -681,6 +873,14 @@ class RequirementSpec(BaseModel):
                 lines.append(f"  • {z.component} → {pos}{size}")
         else:
             lines.append("\n**Layout:** —")
+
+        if self.components:
+            lines.append("\n**Components:**")
+            for c in self.components:
+                zone = f" @ {c.zone_id}" if c.zone_id else ""
+                lines.append(f"  • [{c.component_id}] {c.kind}{zone}")
+        else:
+            lines.append("\n**Components:** —")
 
         if self.entities:
             lines.append("\n**Entities:**")

@@ -8,11 +8,19 @@ from backend.core.setting import get_settings
 from backend.core.session import (
     get_session,
     save_session,
+    save_compiled_ir,
+    get_compiled_ir,
     clear_session,
     session_exists,
 )
+from backend.agents.conversation.models import UIPlan
 from backend.agents.conversation.validators import evaluate_quality_gate
 from backend.emitter.audit import EmitAuditReport, build_emit_audit_report
+from backend.emitter.react_codegen import (
+    deterministic_antd_fallback,
+    generate_react_from_compiled_ir,
+)
+from backend.ir.compiler import IRCompiler
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -33,11 +41,19 @@ class CompileRequest(BaseModel):
     session_id: str
 
 class CompileResponse(BaseModel):
+    class CompileMetadataResponse(BaseModel):
+        ir_version: str
+        generated_at: str
+        warnings: list[str]
+        autofixes: list[str]
+        gate_mode: Literal["hybrid", "hard", "advisory"]
+
     session_id:       str
     component_tree:   dict
     layout:           dict
     data:             dict
     behavior:         dict
+    metadata:         CompileMetadataResponse
 
 class EmitRequest(BaseModel):
     session_id: str
@@ -142,35 +158,38 @@ async def compile_ir(req: CompileRequest):
         raise HTTPException(status_code=404, detail="Session not found")
 
     state = get_session(req.session_id)
+    settings = get_settings()
+    gate = evaluate_quality_gate(
+        state.fields,
+        gate_mode=settings.quality_gate_mode,
+    )
+    missing_slots = state.missing
+    blocking_findings = [item.message for item in gate.blocking_findings]
 
-    if not state.confirmed:
+    if (not state.confirmed) or missing_slots or blocking_findings:
         raise HTTPException(
             status_code=400,
-            detail="UIPlan not yet confirmed. Complete the conversation first."
+            detail={
+                "code": "compile_blocked",
+                "missing_slots": missing_slots,
+                "blocking_findings": blocking_findings,
+                "gate_mode": gate.gate_mode,
+            },
         )
 
     try:
-        # TODO Sprint 2: wire IR compiler
-        # from ir.compiler import IRCompiler
-        # ui_plan   = UIPlan.from_fields(state.fields)
-        # sub_irs   = IRCompiler().compile(ui_plan)
-        # save_session(req.session_id, state)
-        #
-        # return CompileResponse(
-        #     session_id     = req.session_id,
-        #     component_tree = sub_irs.component_tree.model_dump(),
-        #     layout         = sub_irs.layout.model_dump(),
-        #     data           = sub_irs.data.model_dump(),
-        #     behavior       = sub_irs.behavior.model_dump(),
-        # )
+        ui_plan = UIPlan.from_spec(state.fields)
+        compiled = IRCompiler().compile(ui_plan, gate_mode=gate.gate_mode)
+        payload = compiled.model_dump(exclude_none=True)
+        save_compiled_ir(req.session_id, payload)
 
-        # POC placeholder
         return CompileResponse(
             session_id     = req.session_id,
-            component_tree = {},
-            layout         = {},
-            data           = {},
-            behavior       = {},
+            component_tree = payload["component_tree"],
+            layout         = payload["layout"],
+            data           = payload["data"],
+            behavior       = payload["behavior"],
+            metadata       = payload["metadata"],
         )
 
     except Exception as e:
@@ -211,10 +230,37 @@ async def emit_code(req: EmitRequest):
             enabled=settings.react_quality_audit_enabled,
         )
 
-        # POC placeholder
+        compiled_ir = get_compiled_ir(req.session_id)
+        page_tsx: str
+        if compiled_ir is None:
+            logger.warning(
+                "Compiled IR missing for session %s; returning placeholder file.",
+                req.session_id,
+            )
+            page_tsx = (
+                "// No compiled IR found for this session.\n"
+                "// Run POST /api/compile before /api/emit.\n"
+            )
+        else:
+            try:
+                page_tsx = generate_react_from_compiled_ir(
+                    compiled_ir,
+                    model=getattr(settings, "emitter_model", "gpt-4o"),
+                    api_key=getattr(settings, "openai_api_key", None),
+                    temperature=getattr(settings, "emitter_temperature", 0.0),
+                    max_tokens=getattr(settings, "emitter_max_tokens", 4096),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "LLM emit generation failed for session %s, using deterministic fallback: %s",
+                    req.session_id,
+                    exc,
+                )
+                page_tsx = deterministic_antd_fallback(compiled_ir, error=str(exc))
+
         return EmitResponse(
             session_id = req.session_id,
-            files      = {"Page.tsx": "// placeholder — wire emitter in Sprint 3"},
+            files      = {"Page.tsx": page_tsx},
             audit_report = audit_report,
         )
 

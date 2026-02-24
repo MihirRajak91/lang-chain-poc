@@ -29,6 +29,7 @@ IMPORTANT:
 FIELD_TO_SLOT = {
     "goal":         "page_goal",
     "layout":       "layout_zones",
+    "components":   "components",
     "entities":     "entities",
     "actions":      "actions",
     "feedback":     "feedback",
@@ -177,6 +178,20 @@ def _merge_into_spec(
         except Exception as exc:
             logger.warning("Failed to merge layout_zones: %s", exc)
             spec.update_slot_status("layout_zones", "uncertain", 0.0)
+
+    # ── components ────────────────────────────────────────────────────────────
+    components = extracted.get("components")
+    if components:
+        try:
+            components_raw = components if isinstance(components, list) else []
+            changed = spec.merge_components(components_raw)
+            if changed:
+                spec.update_slot_status("components", "complete")
+                updated.append("components")
+                logger.debug("  components → %s", changed)
+        except Exception as exc:
+            logger.warning("Failed to merge components: %s", exc)
+            spec.update_slot_status("components", "uncertain", 0.0)
 
     # ── entities ──────────────────────────────────────────────────────────────
     entities = extracted.get("entities")
@@ -363,6 +378,14 @@ def gap_check_node(state: ConversationState) -> ConversationState:
         )
     else:
         state.recommendation_snapshot = {}
+
+    seeded_components = state.fields.ensure_components_from_layout()
+    if seeded_components:
+        state.fields.update_slot_status("components", "complete")
+        logger.debug(
+            "Auto-seeded components from layout zones: %s",
+            ", ".join(seeded_components),
+        )
 
     gate_mode = getattr(settings, "quality_gate_mode", "hybrid")
     gate = evaluate_quality_gate(state.fields, gate_mode=gate_mode)

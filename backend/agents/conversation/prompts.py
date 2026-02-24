@@ -23,16 +23,19 @@ REQUIRED SLOTS (collect in this order):
                   e.g. "DataTable fixed bottom-right",
                        "PrimaryButton centered",
                        "Modal overlaid center"
-3. entities     — Table names AND their specific columns
+3. components   — Explicit component inventory with IDs and zone links
+                  e.g. "cmp_table_1 DataTable in zone_table",
+                       "cmp_button_1 PrimaryButton in zone_button"
+4. entities     — Table names AND their specific columns
                   e.g. "users table: id, name, height_cm, weight_kg"
-4. actions      — Each interaction with trigger and operation
+5. actions      — Each interaction with trigger and operation
                   e.g. "button click → open modal",
                        "select user → load height/weight",
                        "click calculate → compute BMI"
-5. feedback     — What happens after each action
+6. feedback     — What happens after each action
                   e.g. "after calculate: BMI result shown inline in modal",
                        "after confirm: modal closes, table refreshes"
-6. style        — Theme (light/dark), density (compact/comfortable/spacious),
+7. style        — Theme (light/dark), density (compact/comfortable/spacious),
                   color intent (neutral, brand, high-contrast)
 
 COMPLIANCE CHECKS (capture before final confirmation):
@@ -66,6 +69,7 @@ OUTPUT SCHEMA:
 {
   "goal": string or null,
   "layout": list of zone objects or null,
+  "components": list of component objects or null,
   "entities": list of entity objects or null,
   "actions": list of action objects or null,
   "feedback": list of feedback objects or null,
@@ -98,6 +102,21 @@ FIELD RULES:
   "table at the bottom right"     → [{"zone_id":"zone_table","component":"DataTable","anchor":"bottom-right"}]
   "button in the center"          → [{"zone_id":"zone_button","component":"PrimaryButton","anchor":"center"}]
   "a popup when button clicked"   → [{"zone_id":"zone_modal","component":"Modal","anchor":"center","z_layer":"overlay"}]
+
+"components":
+  list of component objects, each:
+  {
+    "component_id": string (stable id, e.g. "cmp_table_1"),
+    "kind": string (React component name, e.g. "DataTable", "PrimaryButton"),
+    "zone_id": string or null (must match a layout zone when known),
+    "label": string or null,
+    "children": list of component ids,
+    "props": object<string, string>
+  }
+  "data table and primary button" →
+    [{"component_id":"cmp_table_1","kind":"DataTable"},
+     {"component_id":"cmp_button_1","kind":"PrimaryButton"}]
+  If no explicit component inventory is stated → null.
 
 "entities":
   list of entity objects, each:
@@ -256,6 +275,10 @@ FIELD_QUESTIONS = {
     "entities": (
         "Which database table does this page use, "
         "and which specific columns are displayed or needed for calculations?"
+    ),
+    "components": (
+        "List the concrete UI components you want generated, with stable ids and zone mapping. "
+        "For example: cmp_table_1 DataTable in zone_table, cmp_modal_1 Modal in zone_modal."
     ),
     "actions": (
         "What can the user do on this page? "

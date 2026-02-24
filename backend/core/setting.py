@@ -43,6 +43,11 @@ class AgentSettings(BaseSettings):
     summariser_temperature:        float = 0.3
     summariser_max_tokens:         int   = 1024
 
+    # ── Emitter ────────────────────────────────────────────────────────────────
+    emitter_model:                 str   = "gpt-4o"
+    emitter_temperature:           float = 0.0
+    emitter_max_tokens:            int   = 4096
+
     # ── App behaviour ──────────────────────────────────────────────────────────
     free_chat_turn_threshold:      int   = 6
 
