@@ -7,7 +7,6 @@ from .parsing import parse_json_object_with_fallback, strip_json_fences
 from .prompts import (
     CONVERSATIONALIST_SYSTEM,
     EXTRACTOR_SYSTEM,
-    INTERVIEWER_SYSTEM,
     SUMMARISER_SYSTEM,
     FIELD_QUESTIONS,
 )
@@ -37,6 +36,48 @@ FIELD_TO_SLOT = {
     "accessibility":"accessibility",
     "constraints":  "constraints",
 }
+
+GAP_ANSWER_TEMPLATES = {
+    "page_goal": (
+        "Goal: <one sentence user outcome>."
+    ),
+    "layout_zones": (
+        "Layout zones: <zone_id> <component> <anchor> <z_layer>; ..."
+    ),
+    "components": (
+        "Components: <component_id> <kind> in <zone_id>; ..."
+    ),
+    "entities": (
+        "Entity: <table_name> fields: <col1>, <col2>, <col3>."
+    ),
+    "actions": (
+        "Actions: <action_id> <trigger> -> <operation>; ..."
+    ),
+    "feedback": (
+        "Feedback: <action_id> -> <ui_updates>; loading=<spinner|none>; success=<msg|none>; error=<msg|none>."
+    ),
+    "style": (
+        "Style: theme=<light|dark|system>, density=<compact|comfortable|spacious>, tone=<...>, color=<...>."
+    ),
+    "accessibility": (
+        "Accessibility: keyboard_navigation=<true|false>, required_labels=<label1, label2>."
+    ),
+    "constraints": (
+        "Constraints: forms_labeled, url_state_sync, prefers_reduced_motion, intl_formatting."
+    ),
+}
+
+INTERVIEWER_PARAPHRASE_SYSTEM = """
+You rewrite deterministic requirement-collection prompts into natural, clear user-facing questions.
+
+Rules:
+- Keep the exact intent and slot from the source prompt.
+- Keep any hard requirements from the source prompt (answer format, yes/no requirement, concrete detail).
+- Ask about one thing only.
+- Keep to 1-2 sentences.
+- Do not add new requirements.
+- Return plain text only.
+""".strip()
 
 
 # ── NODE 1: chat_node — Conversationalist ─────────────────────────────────────
@@ -390,10 +431,14 @@ def gap_check_node(state: ConversationState) -> ConversationState:
     gate_mode = getattr(settings, "quality_gate_mode", "hybrid")
     gate = evaluate_quality_gate(state.fields, gate_mode=gate_mode)
     state.guideline_violations = [issue.message for issue in gate.blocking_findings]
+    last_user_text = _latest_user_text(state)
 
     if state.missing:
         if (
-            state.free_chat_turns() >= settings.free_chat_turn_threshold
+            (
+                state.free_chat_turns() >= settings.free_chat_turn_threshold
+                or is_confirmation_message(last_user_text)
+            )
             and state.mode == "free_chat"
         ):
             state.mode = "fill_gaps"
@@ -405,6 +450,13 @@ def gap_check_node(state: ConversationState) -> ConversationState:
         if state.mode == "fill_gaps":
             state.mode = "free_chat"
         state.current_gap = None
+
+    active_slots = set(state.missing)
+    if state.current_gap:
+        active_slots.add(state.current_gap)
+    for slot in list(state.gap_ask_counts.keys()):
+        if slot not in active_slots:
+            state.gap_ask_counts.pop(slot, None)
 
     logger.info(
         "Missing: [%s] | Critical: %d | Warnings: %d | Blocking: %d | Gate: %s | Mode: %s%s",
@@ -418,6 +470,119 @@ def gap_check_node(state: ConversationState) -> ConversationState:
     )
 
     return state
+
+
+def _build_guided_gap_prompt(
+    *,
+    slot: str,
+    question: str,
+    attempt: int,
+    is_compliance_followup: bool,
+) -> str:
+    template = GAP_ANSWER_TEMPLATES.get(slot, "Provide one concrete sentence.")
+
+    if is_compliance_followup:
+        if attempt == 1:
+            return (
+                f"{question} A simple yes/no plus one concrete detail is enough. "
+                f"Example format: {template}"
+            )
+        if attempt == 2:
+            return (
+                f"We are close. I still need this to continue: {question} "
+                f"Please answer yes/no and add one concrete detail. "
+                f"Example format: {template}"
+            )
+        return (
+            f"I still cannot finalize because this is unresolved: {question} "
+            f"Please reply in this format: {template}"
+        )
+
+    if attempt == 1:
+        return (
+            f"{question} A quick one-line answer is perfect. "
+            f"Example format: {template}"
+        )
+    if attempt == 2:
+        return (
+            f"Thanks. To move forward I still need `{slot}`. "
+            f"Could you answer like this: {template}"
+        )
+
+    return (
+        f"I still need `{slot}` before I can continue. "
+        f"{question} Please reply in this format: {template}"
+    )
+
+
+def _response_text(content: object) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        chunks = []
+        for item in content:
+            if isinstance(item, str):
+                chunks.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    chunks.append(text)
+        return " ".join(chunks).strip()
+    return str(content).strip()
+
+
+def _paraphrase_gap_prompt(
+    *,
+    agent,
+    slot: str,
+    guided_prompt: str,
+    template: str,
+    compliance_followup: bool,
+    logger,
+) -> str:
+    from backend.core.setting import get_settings
+
+    settings = get_settings()
+    if not getattr(settings, "interviewer_paraphrase_enabled", False):
+        return guided_prompt
+
+    model = getattr(agent, "model", None)
+    if model is None:
+        return guided_prompt
+
+    try:
+        response = model.invoke([
+            {"role": "system", "content": INTERVIEWER_PARAPHRASE_SYSTEM},
+            {
+                "role": "user",
+                "content": (
+                    f"Slot: {slot}\n"
+                    f"Source prompt: {guided_prompt}\n"
+                    "Rewrite now."
+                ),
+            },
+        ])
+    except Exception as exc:
+        logger.warning("Interviewer paraphrase failed; using deterministic prompt: %s", exc)
+        return guided_prompt
+
+    rewritten = _response_text(getattr(response, "content", ""))
+    if not rewritten:
+        logger.warning("Interviewer paraphrase returned empty text; using deterministic prompt")
+        return guided_prompt
+
+    lowered = rewritten.lower()
+    if "example format:" not in lowered and "reply in this format:" not in lowered:
+        rewritten = f"{rewritten.rstrip()} Example format: {template}"
+
+    if compliance_followup and "yes/no" not in rewritten.lower():
+        rewritten = f"{rewritten.rstrip()} Please answer yes/no and add one concrete detail."
+
+    if len(rewritten) > 700:
+        logger.warning("Interviewer paraphrase too long; using deterministic prompt")
+        return guided_prompt
+
+    return rewritten
 
 
 # ── NODE 4: fill_gap_node — Interviewer ──────────────────────────────────────
@@ -434,30 +599,32 @@ def fill_gap_node(state: ConversationState) -> ConversationState:
 
     field   = next((k for k, v in FIELD_TO_SLOT.items() if v == slot), slot)
     question = FIELD_QUESTIONS.get(field, FIELD_QUESTIONS.get(slot, "Can you tell me more?"))
-    if not state.missing and state.guideline_violations:
+    compliance_followup = not state.missing and bool(state.guideline_violations)
+    if compliance_followup:
         question = state.guideline_violations[0]
 
-    missing_slots = set(state.missing)
-    if not state.missing and state.current_gap:
-        missing_slots.add(state.current_gap)
-    filled_slots = [k for k, mapped in FIELD_TO_SLOT.items() if mapped not in missing_slots]
-    filled_str    = ", ".join(filled_slots) if filled_slots else "nothing yet"
+    attempt = state.gap_ask_counts.get(slot, 0) + 1
+    state.gap_ask_counts[slot] = attempt
 
-    logger.info("Asking for missing slot: %s", slot)
-
-    system = INTERVIEWER_SYSTEM.format(
-        filled_fields = filled_str,
-        missing_field = field,
-        base_question = question,
+    template = GAP_ANSWER_TEMPLATES.get(slot, "Provide one concrete sentence.")
+    guided_prompt = _build_guided_gap_prompt(
+        slot=slot,
+        question=question,
+        attempt=attempt,
+        is_compliance_followup=compliance_followup,
+    )
+    final_prompt = _paraphrase_gap_prompt(
+        agent=agent,
+        slot=slot,
+        guided_prompt=guided_prompt,
+        template=template,
+        compliance_followup=compliance_followup,
+        logger=logger,
     )
 
-    response = agent.model.invoke([
-        {"role": "system", "content": system},
-        *state.to_lc_messages(),
-    ])
-
-    state.add_message("assistant", response.content)
-    logger.debug("Question: %s", response.content[:100])
+    logger.info("Asking for missing slot: %s (attempt %d)", slot, attempt)
+    state.add_message("assistant", final_prompt)
+    logger.debug("Question: %s", final_prompt[:120])
     return state
 
 

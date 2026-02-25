@@ -960,6 +960,7 @@ class ConversationState(BaseModel):
     active_agent: Optional[str]   = None
     guideline_violations: list[str] = Field(default_factory=list)
     recommendation_snapshot: dict[str, Any] = Field(default_factory=dict)
+    gap_ask_counts: dict[str, int] = Field(default_factory=dict)
 
     @property
     def missing(self) -> list[str]:

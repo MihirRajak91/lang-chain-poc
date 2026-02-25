@@ -37,6 +37,7 @@ class AgentSettings(BaseSettings):
     interviewer_model:             str   = "gpt-4o"
     interviewer_temperature:       float = 0.6
     interviewer_max_tokens:        int   = 512
+    interviewer_paraphrase_enabled: bool = False
 
     # ── Summariser ─────────────────────────────────────────────────────────────
     summariser_model:              str   = "gpt-4o"
