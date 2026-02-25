@@ -22,6 +22,145 @@ from backend.core.session import compiled_ir_log_path, get_session, save_session
 from backend.core.setting import get_settings
 
 
+class C:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    WHITE = "\033[97m"
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    MAGENTA = "\033[95m"
+    BG_DARK = "\033[40m"
+    BG_NAVY = "\033[44m"
+    BG_GREEN = "\033[42m\033[30m"
+
+
+WIDTH = 88
+
+
+def divider(char: str = "─", color: str = C.DIM) -> None:
+    print(f"{color}{char * WIDTH}{C.RESET}")
+
+
+def header(text: str, color: str = C.BG_NAVY) -> None:
+    pad = WIDTH - len(text) - 4
+    print(f"\n{color}{C.BOLD}  {text}{' ' * max(pad, 0)}  {C.RESET}")
+
+
+def print_user_prompt() -> None:
+    print(f"{C.GREEN}{C.BOLD}  You ›{C.RESET} ", end="", flush=True)
+
+
+def print_assistant(content: str, agent: str) -> None:
+    print(f"\n{C.CYAN}{C.BOLD}  ● {agent}{C.RESET}")
+    for line in content.splitlines():
+        print(f"{C.CYAN}  │ {C.RESET}{line}")
+    print()
+
+
+def _fmt_value(value: object) -> str:
+    if value is None:
+        return "missing"
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True)
+    if isinstance(value, list):
+        if not value:
+            return "missing"
+        return ", ".join(
+            json.dumps(item, sort_keys=True) if isinstance(item, dict) else str(item)
+            for item in value
+        )
+    return str(value)
+
+
+def print_state_snapshot(state: ConversationState, *, blocking_count: int) -> None:
+    header("  STATE SNAPSHOT", color=C.BG_DARK)
+    divider()
+
+    mode_color = {
+        "free_chat": C.YELLOW,
+        "fill_gaps": C.MAGENTA,
+        "confirm": C.CYAN,
+        "done": C.GREEN,
+    }.get(state.mode, C.WHITE)
+
+    print(f"  {C.DIM}mode         {C.RESET}{mode_color}{C.BOLD}{state.mode}{C.RESET}")
+    print(f"  {C.DIM}active_agent {C.RESET}{C.WHITE}{state.active_agent or '—'}{C.RESET}")
+    print(f"  {C.DIM}turns        {C.RESET}{C.WHITE}{state.free_chat_turns()}{C.RESET}")
+    print(f"  {C.DIM}confirmed    {C.RESET}{C.GREEN if state.confirmed else C.RED}{state.confirmed}{C.RESET}")
+    print(f"  {C.DIM}blocking     {C.RESET}{C.YELLOW if blocking_count else C.GREEN}{blocking_count}{C.RESET}")
+
+    divider("·")
+    print(f"  {C.BOLD}Extracted Fields{C.RESET}")
+    fields = state.fields.model_dump()
+    missing_slots = set(state.missing)
+    for field, value in fields.items():
+        if field in missing_slots or value is None or value == []:
+            print(f"  {C.DIM}  {field:<14} ✗  missing{C.RESET}")
+        else:
+            print(f"  {C.GREEN}  {field:<14} ✓{C.RESET}  {_fmt_value(value)}")
+
+    divider("·")
+    if state.missing:
+        print(f"  {C.DIM}missing      {C.RESET}{C.YELLOW}{', '.join(state.missing)}{C.RESET}")
+    else:
+        print(f"  {C.DIM}missing      {C.RESET}{C.GREEN}none — all required fields collected{C.RESET}")
+
+    if state.guideline_violations:
+        print(f"  {C.DIM}compliance   {C.RESET}{C.YELLOW}{len(state.guideline_violations)} open issue(s){C.RESET}")
+        print(f"  {C.DIM}next issue   {C.RESET}{state.guideline_violations[0]}")
+    else:
+        print(f"  {C.DIM}compliance   {C.RESET}{C.GREEN}clear{C.RESET}")
+    divider()
+    print()
+
+
+def print_welcome(*, session_id: str, run_dir: Path) -> None:
+    divider("═")
+    print(
+        f"""
+{C.CYAN}{C.BOLD}  CODEGEN POC — Full Pipeline Runner{C.RESET}
+{C.DIM}  Conversation -> Compile IR -> Emit React (Ant Design){C.RESET}
+
+  Session: {session_id}
+  Run Dir: {run_dir}
+
+  {C.DIM}Commands: 'quit' to exit | 'state' to print current state | 'help' for commands{C.RESET}
+"""
+    )
+    divider("═")
+    print()
+
+
+def print_help() -> None:
+    divider()
+    print(f"  {C.BOLD}Commands{C.RESET}")
+    print("  quit  Exit the runner.")
+    print("  state Print the latest state snapshot.")
+    print("  help  Print available commands.")
+    divider()
+    print()
+
+
+def print_final_summary(summary: dict[str, Any]) -> None:
+    header("  ✓ FULL PIPELINE COMPLETE", color=C.BG_GREEN)
+    divider()
+    print(f"  {C.DIM}session_id   {C.RESET}{summary['session_id']}")
+    print(f"  {C.DIM}run_dir      {C.RESET}{summary['run_dir']}")
+    print(f"  {C.DIM}ui_plan      {C.RESET}{summary['ui_plan_path']}")
+    print(f"  {C.DIM}compiled_ir  {C.RESET}{summary['compiled_ir_path']}")
+    print(f"  {C.DIM}page_tsx     {C.RESET}{summary['page_path']}")
+    print(f"  {C.DIM}compat_tsx   {C.RESET}{summary['compat_page_path']}")
+    print(
+        f"  {C.DIM}audit        {C.RESET}engine={summary['audit_engine']} "
+        f"blocked={summary['audit_blocked']}"
+    )
+    divider()
+    print()
+
+
 def _as_state(value: ConversationState | dict[str, Any]) -> ConversationState:
     if isinstance(value, ConversationState):
         return value
@@ -72,7 +211,8 @@ def _next_input(
 ) -> tuple[str | None, int]:
     if scripted is None:
         try:
-            text = input("You > ").strip()
+            print_user_prompt()
+            text = input().strip()
         except (KeyboardInterrupt, EOFError):
             return None, index
         return text, index
@@ -108,12 +248,13 @@ async def run_pipeline(args: argparse.Namespace) -> int:
     transcript: list[dict[str, Any]] = []
     scripted_index = 0
     turn = 0
+    interactive_mode = scripted_inputs is None
 
-    print(f"session_id={session_id}")
-    print(f"run_dir={run_dir}")
-    if scripted_inputs is None:
-        print("mode=interactive")
+    if interactive_mode:
+        print_welcome(session_id=session_id, run_dir=run_dir)
     else:
+        print(f"session_id={session_id}")
+        print(f"run_dir={run_dir}")
         print(f"mode=scripted inputs={len(scripted_inputs)} auto_confirm={args.auto_confirm}")
 
     while turn < args.max_turns:
@@ -125,19 +266,35 @@ async def run_pipeline(args: argparse.Namespace) -> int:
         )
 
         if user_input is None:
-            print("input_exhausted=true")
+            if interactive_mode:
+                print(f"\n  {C.DIM}Input interrupted or exhausted.{C.RESET}\n")
+            else:
+                print("input_exhausted=true")
             break
 
         user_input = user_input.strip()
         if not user_input:
             if scripted_inputs is not None:
                 continue
-            print("empty_input=true")
             continue
 
-        if user_input.lower() == "quit":
-            print("quit_received=true")
+        normalized = user_input.lower()
+        if normalized == "quit":
+            if interactive_mode:
+                print(f"\n  {C.DIM}Exiting pipeline runner.{C.RESET}\n")
+            else:
+                print("quit_received=true")
             break
+        if interactive_mode and normalized == "help":
+            print_help()
+            continue
+        if interactive_mode and normalized == "state":
+            gate = evaluate_quality_gate(
+                state.fields,
+                gate_mode=settings.quality_gate_mode,
+            )
+            print_state_snapshot(state, blocking_count=len(gate.blocking_findings))
+            continue
 
         state.add_message("user", user_input)
         state = _as_state(await graph.ainvoke(state))
@@ -150,13 +307,18 @@ async def run_pipeline(args: argparse.Namespace) -> int:
         )
 
         turn += 1
-        print(
-            f"turn={turn} mode={state.mode} confirmed={state.confirmed} "
-            f"missing={state.missing} blocking={len(gate.blocking_findings)}"
-        )
-        if assistant:
-            preview = assistant.replace("\n", " ")
-            print(f"assistant={preview[:180]}")
+        if interactive_mode:
+            if assistant:
+                print_assistant(assistant, agent=state.active_agent or "Assistant")
+            print_state_snapshot(state, blocking_count=len(gate.blocking_findings))
+        else:
+            print(
+                f"turn={turn} mode={state.mode} confirmed={state.confirmed} "
+                f"missing={state.missing} blocking={len(gate.blocking_findings)}"
+            )
+            if assistant:
+                preview = assistant.replace("\n", " ")
+                print(f"assistant={preview[:180]}")
 
         transcript.append(
             {
@@ -177,8 +339,16 @@ async def run_pipeline(args: argparse.Namespace) -> int:
     _write_json(run_dir / "transcript.json", transcript)
 
     if state.mode != "done":
-        print("status=incomplete")
-        print("hint=conversation did not reach done mode before input/turn limit.")
+        if interactive_mode:
+            header("  PIPELINE INCOMPLETE", color=C.BG_DARK)
+            divider()
+            print("  Conversation did not reach done mode before input/turn limit.")
+            print(f"  Transcript saved: {run_dir / 'transcript.json'}")
+            divider()
+            print()
+        else:
+            print("status=incomplete")
+            print("hint=conversation did not reach done mode before input/turn limit.")
         return 2
 
     ui_plan = UIPlan.from_spec(state.fields)
@@ -196,8 +366,17 @@ async def run_pipeline(args: argparse.Namespace) -> int:
             "session_id": session_id,
         }
         _write_json(run_dir / "compile_error.json", payload)
-        print(f"status=compile_error http_status={exc.status_code}")
-        print(f"detail={exc.detail}")
+        if interactive_mode:
+            header("  COMPILE FAILED", color=C.BG_DARK)
+            divider()
+            print(f"  http_status: {exc.status_code}")
+            print(f"  detail: {exc.detail}")
+            print(f"  error_file: {run_dir / 'compile_error.json'}")
+            divider()
+            print()
+        else:
+            print(f"status=compile_error http_status={exc.status_code}")
+            print(f"detail={exc.detail}")
         return 3
 
     compile_data = compiled.model_dump(exclude_none=True)
@@ -213,8 +392,17 @@ async def run_pipeline(args: argparse.Namespace) -> int:
             "session_id": session_id,
         }
         _write_json(run_dir / "emit_error.json", payload)
-        print(f"status=emit_error http_status={exc.status_code}")
-        print(f"detail={exc.detail}")
+        if interactive_mode:
+            header("  EMIT FAILED", color=C.BG_DARK)
+            divider()
+            print(f"  http_status: {exc.status_code}")
+            print(f"  detail: {exc.detail}")
+            print(f"  error_file: {run_dir / 'emit_error.json'}")
+            divider()
+            print()
+        else:
+            print(f"status=emit_error http_status={exc.status_code}")
+            print(f"detail={exc.detail}")
         return 4
 
     emit_data = emitted.model_dump(exclude_none=True)
@@ -245,11 +433,14 @@ async def run_pipeline(args: argparse.Namespace) -> int:
     }
     _write_json(run_dir / "summary.json", summary)
 
-    print("status=ok")
-    print(f"ui_plan={run_dir / 'ui_plan.json'}")
-    print(f"compiled_ir={compiled_path}")
-    print(f"page_tsx={page_path}")
-    print(f"page_tsx_compat={compat_page}")
+    if interactive_mode:
+        print_final_summary(summary)
+    else:
+        print("status=ok")
+        print(f"ui_plan={run_dir / 'ui_plan.json'}")
+        print(f"compiled_ir={compiled_path}")
+        print(f"page_tsx={page_path}")
+        print(f"page_tsx_compat={compat_page}")
     return 0
 
 
