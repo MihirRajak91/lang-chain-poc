@@ -245,10 +245,11 @@ async def emit_code(req: EmitRequest):
             try:
                 page_tsx = generate_react_from_compiled_ir(
                     compiled_ir,
-                    model=getattr(settings, "emitter_model", "gpt-4o"),
-                    api_key=getattr(settings, "openai_api_key", None),
+                    model=getattr(settings, "emitter_model", "anthropic.claude-sonnet-4-5-20250929-v1:0"),
                     temperature=getattr(settings, "emitter_temperature", 0.0),
                     max_tokens=getattr(settings, "emitter_max_tokens", 4096),
+                    provider=getattr(settings, "llm_primary_provider", "bedrock"),
+                    settings=settings,
                 )
             except Exception as exc:
                 logger.warning(

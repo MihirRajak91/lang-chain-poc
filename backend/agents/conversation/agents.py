@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from typing import Optional
-from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
+
+from backend.core.llm import build_chat_model
 from backend.core.setting import get_settings
 
 settings = get_settings()
@@ -11,20 +13,20 @@ settings = get_settings()
 class AgentConfig:
     name:        str
     description: str
-    model:       Optional[ChatOpenAI]   # None for logic-only nodes
+    model:       Optional[BaseChatModel]   # None for logic-only nodes
     node:        str
 
 
-def _llm(model: str, temperature: float, max_tokens: int) -> ChatOpenAI:
+def _llm(model: str, temperature: float, max_tokens: int) -> BaseChatModel:
     """
-    Builds a ChatOpenAI instance from settings values.
-    Each agent gets its own isolated instance.
+    Builds a provider-agnostic chat model from settings values.
     """
-    return ChatOpenAI(
-        api_key      = settings.openai_api_key,
+    return build_chat_model(
+        provider     = settings.llm_primary_provider,
         model        = model,
         temperature  = temperature,
         max_tokens   = max_tokens,
+        settings     = settings,
     )
 
 

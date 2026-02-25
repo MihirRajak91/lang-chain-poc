@@ -4,8 +4,8 @@ import json
 import re
 from typing import Any
 
-from langchain_openai import ChatOpenAI
-
+from backend.core.llm import build_chat_model
+from backend.core.setting import AgentSettings, get_settings
 from backend.ir.models import CompiledIRBundle
 
 
@@ -59,23 +59,26 @@ IR JSON:
 def generate_react_from_compiled_ir(
     ir_bundle: CompiledIRBundle | dict[str, Any],
     *,
-    model: str = "gpt-5.2",
-    api_key: str | None = None,
+    model: str = "anthropic.claude-sonnet-4-5-20250929-v1:0",
     temperature: float = 0.0,
     max_tokens: int | None = None,
+    provider: str | None = None,
+    settings: AgentSettings | None = None,
 ) -> str:
     bundle = (
         ir_bundle
         if isinstance(ir_bundle, CompiledIRBundle)
         else CompiledIRBundle.model_validate(ir_bundle)
     )
+    active_settings = settings or get_settings()
 
     prompt = build_antd_prompt(bundle.model_dump_json(indent=2))
-    llm = ChatOpenAI(
+    llm = build_chat_model(
+        provider=provider or active_settings.llm_primary_provider,
         model=model,
         temperature=temperature,
-        api_key=api_key,
         max_tokens=max_tokens,
+        settings=active_settings,
     )
     response = llm.invoke(prompt)
     raw = response.content if isinstance(response.content, str) else str(response.content)

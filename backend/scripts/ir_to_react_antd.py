@@ -48,9 +48,10 @@ def main() -> None:
         tsx = generate_react_from_compiled_ir(
             compiled,
             model=model,
-            api_key=settings.openai_api_key,
             temperature=settings.emitter_temperature,
             max_tokens=settings.emitter_max_tokens,
+            provider=settings.llm_primary_provider,
+            settings=settings,
         )
     except Exception as exc:
         tsx = deterministic_antd_fallback(compiled, error=str(exc))
